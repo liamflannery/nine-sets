@@ -376,11 +376,40 @@ function checkComplete(w){
 
 /* ================= Timer ================= */
 let audioCtx = null, wakeLock = null, timerFired = false, lastInterval = 0;
-function unlockAudio(){ try { if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } catch(e){} }
+// Pings play through <audio> elements made from a generated WAV. On iPhone these are unlocked on the
+// first tap and, unlike Web Audio, still play with the ring/silent switch on.
+const pings = {};
+function pingWav(tones){
+  const rate = 22050, gap = .28, len = .24, n = Math.ceil(rate*(gap*(tones.length-1)+len+.05));
+  const buf = new ArrayBuffer(44 + n*2), v = new DataView(buf), w = (o,str) => [...str].forEach((c,i)=>v.setUint8(o+i,c.charCodeAt(0)));
+  w(0,'RIFF'); v.setUint32(4,36+n*2,true); w(8,'WAVEfmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,rate,true); v.setUint32(28,rate*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,n*2,true);
+  const out = new Float32Array(n);
+  tones.forEach((hz,k) => { const st = Math.floor(k*gap*rate), m = Math.floor(len*rate);
+    for (let i = 0; i < m && st+i < n; i++){ const t = i/rate, env = Math.min(1, t/.01) * Math.exp(-t*14); out[st+i] += Math.sin(2*Math.PI*hz*t) * env * .9; } });
+  for (let i = 0; i < n; i++) v.setInt16(44+i*2, Math.max(-1,Math.min(1,out[i]))*32767, true);
+  return URL.createObjectURL(new Blob([buf], {type:'audio/wav'}));
+}
+function getPing(key){
+  if (!pings[key]){ const tones = key === 'end' ? [880,880,1175] : [660]; const a = new Audio(pingWav(tones)); a.preload = 'auto'; a.setAttribute('playsinline',''); pings[key] = {a, primed:false}; }
+  return pings[key];
+}
+function unlockAudio(){
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch(e){}
+  try { if (!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)(); if (audioCtx.state !== 'running') audioCtx.resume(); } catch(e){}
+  ['end','tick'].forEach(k => { try { const p = getPing(k); if (p.primed) return; p.primed = true;
+    p.a.muted = true; const pr = p.a.play(); if (pr) pr.then(() => { p.a.pause(); p.a.currentTime = 0; p.a.muted = false; }).catch(() => { p.primed = false; p.a.muted = false; }); } catch(e){} });
+}
 function beep(n, hz){
-  if (!S.settings.sound || !audioCtx) return;
+  if (!S.settings.sound) return;
+  const vol = Math.max(0.05, Math.min(1, (S.settings.volume||10)/15));
+  try { const p = getPing(n === 1 ? 'tick' : 'end'); p.a.muted = false; p.a.volume = vol; p.a.currentTime = 0;
+    const pr = p.a.play(); if (pr) pr.catch(() => webBeep(n, hz)); } catch(e){ webBeep(n, hz); }
+}
+function webBeep(n, hz){
+  if (!audioCtx) return;
   const vol = Math.max(0.02, Math.min(1, (S.settings.volume||10)/15)) * .5;
-  try { const t0 = audioCtx.currentTime;
+  try { if (audioCtx.state !== 'running') audioCtx.resume(); const t0 = audioCtx.currentTime;
     for (let i = 0; i < (n||3); i++){ const d = i*.28, o = audioCtx.createOscillator(), g = audioCtx.createGain(); o.frequency.value = hz || (i===(n||3)-1 ? 1175 : 880); g.gain.setValueAtTime(.0001,t0+d); g.gain.exponentialRampToValueAtTime(vol,t0+d+.02); g.gain.exponentialRampToValueAtTime(.0001,t0+d+.22); o.connect(g).connect(audioCtx.destination); o.start(t0+d); o.stop(t0+d+.24); }
   } catch(e){}
 }
@@ -909,6 +938,7 @@ function importFile(e){
 }
 
 /* ================= Events ================= */
+['touchend','pointerdown','keydown'].forEach(t => document.addEventListener(t, unlockAudio, {passive:true}));
 document.addEventListener('click', e => {
   unlockAudio();
   const b = e.target.closest('[data-a]'); if (!b) return;
