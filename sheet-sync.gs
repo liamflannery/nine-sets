@@ -1,13 +1,15 @@
 // Nine Sets -> Google Sheet sync.
-// Paste this into Extensions > Apps Script in the "Nine Sets log" sheet,
+// Paste this into a new project at script.google.com (or Extensions > Apps Script in the sheet),
 // then Deploy > New deployment > Web app (Execute as: Me, Who has access: Anyone).
+
+var SHEET_ID = '1kXnHY0hhDxa8HMmf52zunQyWdrQoBP-kJHxJ1QyUc4c'; // Nine Sets log
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     var data = JSON.parse(e.postData.contents);
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = SpreadsheetApp.openById(SHEET_ID);
 
     // Sessions: replace all rows for each session id, then append the new rows.
     var sets = ss.getSheetByName('Sets');
