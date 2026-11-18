@@ -288,7 +288,7 @@ function plateString(total, exId){
 function suggestionFor(reps){ if (!reps || reps < 1) return 0; return S.settings.prog[Math.min(8, reps) - 1]; }
 function setTM(key, val, why){
   val = Math.max(0, +val || 0); if (S.tm[key] === val) return;
-  S.tm[key] = val; S.tmLog.push({date:new Date().toISOString(), key, tm:val, why:why||'edit'});
+  S.tm[key] = val; S.tmLog.push({date:new Date().toISOString(), key, tm:val, why:why||'edit'}); S.syncMeta = true;
 }
 function variantTmKeys(vId){
   const keys = new Set(); for (const d of S.variants[vId || S.variant].days) for (const m of d.main) if (m.tier !== 3) keys.add(m.tm);
@@ -323,9 +323,49 @@ function syncHistory(w){
   const idx = S.history.findIndex(h => h.id === w.id);
   if (!done){ if (idx >= 0) S.history.splice(idx, 1); return; }
   const h = clone(w); h.dayName = 'Day ' + (w.dayIdx+1);
-  h.entries.forEach(e => { e.sets = e.sets.filter(s => s.done).map(s => ({w:+s.w||0, reps:+s.reps||0, target:s.target, amrap:s.amrap, drive:s.drive, done:true})); });
+  h.entries.forEach(e => { if (e.tm) e.tmVal = S.tm[e.tm]; e.sets = e.sets.filter(s => s.done).map(s => ({w:+s.w||0, reps:+s.reps||0, target:s.target, amrap:s.amrap, drive:s.drive, pct:s.pct, at:s.at||new Date().toISOString(), done:true})); });
   h.entries = h.entries.filter(e => e.sets.length);
   if (idx >= 0) { h.date = S.history[idx].date; S.history[idx] = h; } else { h.date = todayIso(); S.history.push(h); }
+  queueSync(w.id);
+}
+
+/* ================= Google Sheet sync ================= */
+let syncing = false;
+function queueSync(id){ S.syncQ = S.syncQ || []; if (id && !S.syncQ.includes(id)) S.syncQ.push(id); S.syncMeta = true; save(); setTimeout(flushSync, 400); }
+function sessionRows(h){
+  const rows = [];
+  h.entries.forEach(e => e.sets.forEach((s, i) => rows.push([h.id, h.date, h.week, 'Day ' + (h.dayIdx+1) + (h.deload ? ' (deload)' : ''), exName(e.ex), e.tier <= 2 ? 'T'+e.tier : (e.tier === 3 ? 'T3' : 'Accessory'), i+1, +s.reps||0, +s.w||0, s.amrap ? 'Yes' : '', s.target ?? '', s.pct ? Math.round(s.pct*100) + '%' : '', e.tmVal ?? '', s.at ? new Date(s.at).toLocaleString() : ''])));
+  return rows;
+}
+async function flushSync(final){
+  const url = S.settings.syncUrl; if (!url || syncing || !navigator.onLine) return;
+  const q = (S.syncQ || []).slice(); if (!q.length && !S.syncMeta) return;
+  const payload = {
+    sessions: q.map(id => { const h = S.history.find(x => x.id === id); return {id, rows: h ? sessionRows(h) : []}; }),
+    tms: S.tmLog.map(t => [t.date.slice(0,10), exName(t.key), t.tm, t.why || '']),
+    bw: [...S.bw].sort((p,q2)=>p.date.localeCompare(q2.date)).map(b => [b.date, b.kg]),
+  };
+  syncing = true;
+  try {
+    await fetch(url, {method:'POST', mode:'no-cors', keepalive: !!final, headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify(payload)});
+    S.syncQ = (S.syncQ || []).filter(id => !q.includes(id)); S.syncMeta = false; S.lastSync = new Date().toISOString(); save();
+  } catch(e) { /* offline or blocked: stays queued */ }
+  syncing = false;
+}
+window.addEventListener('online', () => flushSync());
+(function readSyncLink(){
+  const m = location.hash.match(/sync=([^&]+)/);
+  if (m) { try { S.settings.syncUrl = decodeURIComponent(m[1]); S.syncQ = S.history.map(h => h.id); S.syncMeta = true; save(); history.replaceState(null, '', location.pathname); setTimeout(() => toast('Google Sheet sync connected'), 600); } catch(e){} }
+})();
+function syncDlg(){
+  dlg(`<h2>Google Sheet Sync</h2><div class="m" style="color:var(--muted)">Every set you log is sent to your Google Sheet. If you're offline it waits and sends later.</div>
+    <label class="f">Sync address</label><input id="su" value="${esc(S.settings.syncUrl||'')}" placeholder="https://script.google.com/macros/s/.../exec">
+    <div class="m" style="color:var(--muted);margin-top:8px">${S.lastSync ? 'Last sent ' + new Date(S.lastSync).toLocaleString() : 'Nothing sent yet'}${(S.syncQ||[]).length ? ' · ' + S.syncQ.length + ' waiting' : ''}</div>
+    <button class="btn full" id="all" style="margin:10px 0 0">Send all history again</button>
+    <div class="acts"><button data-a="closeDlg">Cancel</button><button id="ok">Save</button></div>`, el => {
+      el.querySelector('#all').onclick = () => { S.settings.syncUrl = el.querySelector('#su').value.trim(); S.syncQ = S.history.map(h => h.id); S.syncMeta = true; save(); flushSync(); toast('Sending'); closeDlg(); render(); };
+      el.querySelector('#ok').onclick = () => { const u = el.querySelector('#su').value.trim(); if (u && !/^https:\/\/script\.google(usercontent)?\.com\//.test(u)) return toast('That isn\'t an Apps Script address'); const was = S.settings.syncUrl; S.settings.syncUrl = u; if (u && u !== was) { S.syncQ = S.history.map(h => h.id); S.syncMeta = true; } save(); flushSync(); closeDlg(); render(); };
+  });
 }
 function checkComplete(w){
   const all = w.entries.length && w.entries.every(e => e.sets.every(s => s.done));
@@ -383,7 +423,7 @@ function notifyNextSet(prefix){
   if (n.s.amrap) notify((prefix ? prefix + ' · ' : '') + exName(n.e.ex), line + '\nAMRAP set - Open workout to log reps' + (plates ? '\n' + plates : ''), [{action:'open',title:'Open Workout'}]);
   else notify((prefix ? prefix + ' · ' : '') + exName(n.e.ex), line + (plates ? '\n' + plates : ''), [{action:'complete',title:'Set Complete'},{action:'open',title:'Open Workout'}]);
 }
-document.addEventListener('visibilitychange', () => { if (document.hidden) { if (curDay() != null) notifyNextSet(); } else { clearNotif(); renderClock(); requestWake(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden) { flushSync(true); if (curDay() != null) notifyNextSet(); } else { clearNotif(); renderClock(); requestWake(); } });
 navigator.serviceWorker?.addEventListener('message', ev => {
   const d = ev.data || {}; if (d.type !== 'notif' && d.type !== 'timer') return;
   if (d.action === 'complete'){ const day = curDay(); if (day == null) return; const w = S.workouts[day]; const n = w && nextSet(w); if (n && !n.s.amrap){ completeSet(w, n.ei, n.si, true); notifyNextSet('Set logged'); } }
@@ -476,7 +516,7 @@ function completeSet(w, ei, si, fromNotif){
   if (s.amrap && (s.reps === '' || s.reps == null)){ toast('Enter Reps'); return false; }
   if (s.reps === '' || s.reps == null) s.reps = s.target;
   if (s.w === '' && !(S.ex[e.ex]||{}).bw){ toast('Enter Weight'); return false; }
-  s.done = true; s.reps = +s.reps;
+  s.done = true; s.reps = +s.reps; s.at = new Date().toISOString();
   syncHistory(w); const fin = checkComplete(w); save();
   if (!fin && S.settings.autoTimer && e.timer) startTimer(S.settings.restSecs);
   if (!fromNotif) render();
@@ -629,7 +669,7 @@ PAGES.settings = () => {
       ${r('setPlates','layers','Plate Availability Preferences', Object.keys(st.plates).filter(p=>st.plates[p]).sort((x,y)=>y-x).join(', '))}
       ${r('setRound','round','Weight Rounding Preferences', 'Round to ' + fmt(st.round) + ' kg')}</div>
     <div class="card"><div class="sect">Help</div>${r('appFaq','help','App FAQ')}${r('progFaq','book','Program FAQ')}</div>
-    <div class="card"><div class="sect">Data</div>${r('exportJson','save','Back Up Data','Save a file you can import later')}${r('importJson','upload','Restore Backup')}${r('exportCsv','list','Export Sets as CSV')}${r('setTheme','palette','Theme', st.theme)}${r('resetAll','delete','Erase All Data')}</div>
+    <div class="card"><div class="sect">Data</div>${r('syncSet','upload','Google Sheet Sync', st.syncUrl ? 'On' + (S.lastSync ? ', last sent ' + new Date(S.lastSync).toLocaleString() : '') : 'Off')}${r('exportJson','save','Back Up Data','Save a file you can import later')}${r('importJson','upload','Restore Backup')}${r('exportCsv','list','Export Sets as CSV')}${r('setTheme','palette','Theme', st.theme)}${r('resetAll','delete','Erase All Data')}</div>
     <input type="file" id="importFile" accept="application/json,.json" class="hidden">`;
   $('#importFile').onchange = importFile;
 };
@@ -880,13 +920,13 @@ document.addEventListener('click', e => {
     case 'nav': go(b.dataset.p); break;
     case 'openDay': go('workout', +b.dataset.d); requestWake(); break;
     case 'toggleDay': { const d = +b.dataset.d; S.weekDone = S.weekDone.includes(d) ? S.weekDone.filter(x=>x!==d) : [...S.weekDone, d]; save(); render(); break; }
-    case 'dayOpts': { const d = +b.dataset.d; optionsDlg('Workout Options', [['Restart Workout', () => confirmDlg('Warning', 'Pressing Accept will restart the selected workout and any saved sets will be lost.', () => { const w = S.workouts[d]; if (w){ const i = S.history.findIndex(h=>h.id===w.id); if (i>=0) S.history.splice(i,1); } delete S.workouts[d]; S.weekDone = S.weekDone.filter(x=>x!==d); save(); render(); toast('Restarted Workout'); })]]); break; }
+    case 'dayOpts': { const d = +b.dataset.d; optionsDlg('Workout Options', [['Restart Workout', () => confirmDlg('Warning', 'Pressing Accept will restart the selected workout and any saved sets will be lost.', () => { const w = S.workouts[d]; if (w){ const i = S.history.findIndex(h=>h.id===w.id); if (i>=0) { S.history.splice(i,1); queueSync(w.id); } } delete S.workouts[d]; S.weekDone = S.weekDone.filter(x=>x!==d); save(); render(); toast('Restarted Workout'); })]]); break; }
     case 'tmEdit': tmEditDlg(b.dataset.k); break;
     case 'tmCalc': collectSetup(); tmCalcDlg(); break;
     case 'finishSetup': {
       collectSetup(); const v = S._sv || S.variant; S.variant = v; delete S._sv;
       const keys = variantTmKeys(v); if (keys.some(k => !(S.tm[k] > 0))) { toast('Check All Values Entered'); break; }
-      keys.forEach(k => S.tmLog.push({date:new Date().toISOString(), key:k, tm:S.tm[k], why:'start'}));
+      keys.forEach(k => S.tmLog.push({date:new Date().toISOString(), key:k, tm:S.tm[k], why:'start'})); S.syncMeta = true; setTimeout(flushSync, 500);
       S.setup = true; save(); nav = [{page:'home'}]; render(); if (navigator.storage?.persist) navigator.storage.persist(); break; }
     case 'doneSet': { const w = W(); syncInputs(); completeSet(w, ei, si); requestWake(); break; }
     case 'redoSet': { const w = W(); const s = w.entries[ei].sets[si]; s.done = false; S.weekDone = S.weekDone.filter(x => x !== w.dayIdx); syncHistory(w); save(); render(); break; }
@@ -916,10 +956,10 @@ document.addEventListener('click', e => {
     case 'customTms': customTmsDlg(); break;
     case 'progSugg': progSuggDlg(); break;
     case 'pickDate': S._hd = b.dataset.d; render(); break;
-    case 'delHist': confirmDlg('Delete Workout', 'Delete this workout from your history?', () => { S.history = S.history.filter(h => h.id !== b.dataset.id); save(); render(); }); break;
-    case 'bwEnter': { const kg = +$('#bwv').value; const d = $('#bwd').value || todayIso(); if (!(kg > 0)) { toast('Enter Valid Weight'); break; } const ex = S.bw.find(x=>x.date===d); if (ex) ex.kg = kg; else S.bw.push({date:d, kg}); save(); toast(ex ? 'Updated Weight' : 'Added Weight to log'); render(); break; }
+    case 'delHist': confirmDlg('Delete Workout', 'Delete this workout from your history?', () => { S.history = S.history.filter(h => h.id !== b.dataset.id); queueSync(b.dataset.id); render(); }); break;
+    case 'bwEnter': { const kg = +$('#bwv').value; const d = $('#bwd').value || todayIso(); if (!(kg > 0)) { toast('Enter Valid Weight'); break; } const ex = S.bw.find(x=>x.date===d); if (ex) ex.kg = kg; else S.bw.push({date:d, kg}); queueSync(); toast(ex ? 'Updated Weight' : 'Added Weight to log'); render(); break; }
     case 'bwTab': S._bwt = b.dataset.t; render(); break;
-    case 'bwDel': S.bw = S.bw.filter(x => x.date !== b.dataset.d); save(); render(); break;
+    case 'bwDel': S.bw = S.bw.filter(x => x.date !== b.dataset.d); queueSync(); render(); break;
     case 'setTimer': settingsTimerDlg(); break;
     case 'setSound': settingsSoundDlg(); break;
     case 'setBar': settingsBarDlg(); break;
@@ -927,6 +967,7 @@ document.addEventListener('click', e => {
     case 'setRound': settingsRoundDlg(); break;
     case 'appFaq': go('faq', 'app'); break;
     case 'progFaq': go('faq', 'prog'); break;
+    case 'syncSet': syncDlg(); break;
     case 'exportJson': exportJson(); break;
     case 'importJson': $('#importFile').click(); break;
     case 'exportCsv': exportCsv(); break;
@@ -946,7 +987,7 @@ document.addEventListener('change', e => {
 /* ================= Boot ================= */
 try { history.replaceState({d:1}, ''); } catch(e){}
 if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(()=>{});
-render(); requestWake();
+render(); requestWake(); flushSync();
 </script>
 </body>
 </html>
