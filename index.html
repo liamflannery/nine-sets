@@ -244,7 +244,7 @@ function defaults(){
     v:2, setup:false, variant:'plan3', pendingVariant:null, variants:variantTemplates(), week:1, weekDone:[], workouts:{},
     ex, tm:{}, customTms:[], tmLog:[], history:[], bw:[], deload:false,
     settings:{round:2.5, bar:20, plates:{'25':1,'20':1,'15':1,'10':1,'7.5':0,'5':1,'2.5':1,'1.25':1,'0.5':0},
-      autoTimer:true, restSecs:120, sound:true, volume:10, vibrate:true, silentPing:false, interval:false, intervalSecs:30, notify:false, wake:true,
+      autoTimer:true, restSecs:120, sound:true, volume:10, vibrate:true, pingSilent:false, interval:false, intervalSecs:30, notify:false, wake:true,
       prog:[0,2.5,2.5,5,5,5,7.5,7.5], theme:'light', syncUrl:'https://script.google.com/macros/s/AKfycbxdezCNblqLQ-SVmJRItkXo7rJDf5mnRO6pGNiIt9uULISP5wD8wPsfjHWejFg8Iyw0nw/exec'},
     timer:null,
   };
@@ -387,11 +387,12 @@ function unlockAudio(){
 }
 function beep(n, hz){
   if (!S.settings.sound) return;
-  if (S.settings.silentPing && navigator.audioSession){
+  if (S.settings.pingSilent && navigator.audioSession){
     clearTimeout(pingBusy); setAudioType('playback');
     pingBusy = setTimeout(() => { pingBusy = null; setAudioType('ambient'); }, (n||3)*280 + 600);
   }
   webBeep(n, hz);
+  clearTimeout(beep.idle); beep.idle = setTimeout(() => { try { if (audioCtx && !S.timer) audioCtx.suspend(); } catch(e){} }, (n||3)*280 + 800);
 }
 function webBeep(n, hz){
   if (!audioCtx) return;
@@ -407,7 +408,7 @@ async function notify(title, body, actions, tag){
   try { await reg.showNotification(title, {body, tag:tag||'workout', renotify:true, icon:'icon-192.png', badge:'icon-192.png', vibrate:S.settings.vibrate?[300,150,300]:[], actions:actions||[], data:{day:curDay()}}); } catch(e){}
 }
 async function clearNotif(){ const reg = await swReg(); try { (await reg.getNotifications()).forEach(n=>n.close()); } catch(e){} }
-function startTimer(secs){ S.timer = {end: Date.now() + secs*1000, total: secs}; timerFired = false; lastInterval = Date.now(); save(); renderClock(); }
+function startTimer(secs){ unlockAudio(); S.timer = {end: Date.now() + secs*1000, total: secs}; timerFired = false; lastInterval = Date.now(); save(); renderClock(); }
 function stopTimer(){ S.timer = null; save(); renderClock(); }
 function timerLeft(){ return S.timer ? (S.timer.end - Date.now())/1000 : 0; }
 function renderClock(){
@@ -421,6 +422,7 @@ function renderClock(){
     if (document.hidden) notifyNextSet('Rest finished');
   }
   if (left < -60) stopTimer();
+  if (timerFired && left < -3 && audioCtx && audioCtx.state === 'running') { try { audioCtx.suspend(); } catch(e){} }
 }
 setInterval(renderClock, 250);
 async function requestWake(){
@@ -685,7 +687,7 @@ PAGES.settings = () => {
       ${r('setPlates','layers','Plate Availability Preferences', Object.keys(st.plates).filter(p=>st.plates[p]).sort((x,y)=>y-x).join(', '))}
       ${r('setRound','round','Weight Rounding Preferences', 'Round to ' + fmt(st.round) + ' kg')}</div>
     <div class="card"><div class="sect">Help</div>${r('appFaq','help','App FAQ')}${r('progFaq','book','Program FAQ')}</div>
-    <div class="card"><div class="sect">Data</div>${r('syncSet','upload','Google Sheet Sync', st.syncUrl ? 'On' + (S.lastSync ? ', last sent ' + new Date(S.lastSync).toLocaleString() : '') : 'Off')}${r('exportJson','save','Back Up Data','Save a file you can import later')}${r('importJson','upload','Restore Backup')}${r('exportCsv','list','Export Sets as CSV')}${r('setTheme','palette','Theme', st.theme)}${r('resetAll','delete','Erase All Data')}</div>
+    <div class="card"><div class="sect">Data</div>${r('syncSet','upload','Google Sheet Sync', st.syncUrl ? 'On' + (S.lastSync ? ', last sent ' + new Date(S.lastSync).toLocaleString() : '') : 'Off')}${r('exportJson','save','Back Up Data','Save a file you can import later')}${r('importJson','upload','Restore Backup')}${r('exportCsv','list','Export Sets as CSV')}${r('setTheme','palette','Theme', st.theme)}${r('resetAll','delete','Erase All Data')}</div><div style="text-align:center;color:var(--muted);font-size:12px;margin:8px 0 16px">Version 8</div>
     <input type="file" id="importFile" accept="application/json,.json" class="hidden">`;
   $('#importFile').onchange = importFile;
 };
@@ -872,14 +874,14 @@ function settingsSoundDlg(){
   const st = S.settings;
   dlg(`<h2>Rest Timer Sound</h2><label class="opt"><input type="checkbox" id="so" ${st.sound?'checked':''} style="width:auto;transform:scale(1.3)"> Sound Alerts</label>
     <label class="f">Volume</label><input type="range" min="1" max="15" id="vo" value="${st.volume}">
-    <label class="opt"><input type="checkbox" id="sp" ${st.silentPing?'checked':''} style="width:auto;transform:scale(1.3)"> Ping on silent (iPhone: pauses your music for the ping)</label>
+    <label class="opt"><input type="checkbox" id="sp" ${st.pingSilent?'checked':''} style="width:auto;transform:scale(1.3)"> Ping on silent (iPhone: pauses your music for the ping)</label>
     <label class="opt"><input type="checkbox" id="vi" ${st.vibrate?'checked':''} style="width:auto;transform:scale(1.3)"> Vibration (Android)</label>
     <label class="opt"><input type="checkbox" id="no" ${st.notify?'checked':''} style="width:auto;transform:scale(1.3)"> Notifications and lock screen controls</label>
     <button class="btn full" id="test" style="margin:6px 0">Test Sound</button>
     <div class="acts"><button data-a="closeDlg">Cancel</button><button id="ok">Accept</button></div>`, el => {
-      el.querySelector('#test').onclick = () => { unlockAudio(); const v = st.volume, s0 = st.sound, p0 = st.silentPing; st.volume = +el.querySelector('#vo').value; st.sound = true; st.silentPing = el.querySelector('#sp').checked; beep(3); st.volume = v; st.sound = s0; st.silentPing = p0; };
+      el.querySelector('#test').onclick = () => { unlockAudio(); const v = st.volume, s0 = st.sound, p0 = st.pingSilent; st.volume = +el.querySelector('#vo').value; st.sound = true; st.pingSilent = el.querySelector('#sp').checked; beep(3); st.volume = v; st.sound = s0; st.pingSilent = p0; };
       el.querySelector('#ok').onclick = async () => {
-        st.sound = el.querySelector('#so').checked; st.volume = +el.querySelector('#vo').value; st.vibrate = el.querySelector('#vi').checked; st.silentPing = el.querySelector('#sp').checked;
+        st.sound = el.querySelector('#so').checked; st.volume = +el.querySelector('#vo').value; st.vibrate = el.querySelector('#vi').checked; st.pingSilent = el.querySelector('#sp').checked;
         const want = el.querySelector('#no').checked;
         if (want && !st.notify){ if (!('Notification' in window)) { toast('Install the app to your home screen to use notifications'); st.notify = false; } else { const p = await Notification.requestPermission(); st.notify = p === 'granted'; if (!st.notify) toast('Notifications blocked'); } } else st.notify = want;
         save(); closeDlg(); render(); };
@@ -927,7 +929,6 @@ function importFile(e){
 
 /* ================= Events ================= */
 document.addEventListener('click', e => {
-  unlockAudio();
   const b = e.target.closest('[data-a]'); if (!b) return;
   const A = b.dataset.a, ei = +b.dataset.e, si = +b.dataset.s;
   const W = () => S.workouts[curDay()];
