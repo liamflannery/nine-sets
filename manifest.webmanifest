@@ -1,0 +1,15 @@
+{
+  "name": "Nine Sets",
+  "short_name": "Nine Sets",
+  "description": "Private nSuns 5/3/1 workout logger",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ebebeb",
+  "theme_color": "#3f51b5",
+  "icons": [
+    {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}
