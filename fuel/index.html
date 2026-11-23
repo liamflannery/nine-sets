@@ -106,6 +106,12 @@ svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .sheet{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;animation:up .18s ease-out}
 @keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.sheet{animation:none}}
+.backdrop{position:fixed;inset:0;z-index:49;background:rgba(0,0,0,.55)}
+.sheet.half{top:auto;max-height:80vh;border-radius:22px 22px 0 0;background:var(--card);box-shadow:0 -8px 30px rgba(0,0,0,.4)}
+.sheet.half .sh-top{padding-top:12px}
+.sheet.half .sh-body{flex:none}
+.sheet.half .menu-item{background:var(--card2)}
+.sheet.half .sc span{background:var(--card2)}
 .sh-top{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 10px) 12px 10px;max-width:560px;width:100%;margin:0 auto}
 .sh-top h2{margin:0;flex:1;font-size:19px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sh-body{flex:1;overflow-y:auto;padding:4px 16px calc(24px + env(safe-area-inset-bottom));max-width:560px;width:100%;margin:0 auto;-webkit-overflow-scrolling:touch}
@@ -161,6 +167,40 @@ svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .toast button{color:#1463FF;font-weight:800}
 svg.chart{width:100%;height:auto;display:block}
 .sug-h{display:flex;justify-content:space-between;align-items:baseline}
+.link{color:var(--acc);font-weight:700;font-size:13px;text-transform:none;letter-spacing:0}
+.qwrap{display:flex;gap:8px;align-items:center;background:var(--chip);border-radius:99px;padding:0 4px 0 14px;margin-bottom:8px}
+.qwrap input{background:none;border:0;padding:12px 4px;font-size:17px}
+.qwrap input:focus{border:0}
+.qwrap .qi{color:var(--ink3);display:grid}
+.qwrap .ib{width:40px;height:40px;background:none;color:var(--ink)}
+.tchip{width:auto!important;padding:8px 10px!important;border-radius:99px!important;font-weight:700;font-size:14px}
+.kchip{font-weight:700}.kchip.over{color:var(--bad)}
+.srow{padding:0;gap:0}
+.srow-main{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:12px 4px 12px 12px;text-align:left}
+.srow .addb{margin-right:12px}
+.addb.on{background:var(--acc);color:var(--onacc)}
+b.hit{color:var(--ink);font-weight:800;text-decoration:underline;text-decoration-color:var(--acc);text-underline-offset:3px}
+.fhead{display:flex;gap:12px;align-items:center;margin:2px 0 12px}
+.ic.big{width:56px;height:56px;font-size:32px;border-radius:16px}
+.nbig .pct{display:block;font-style:normal;font-size:11px;font-weight:700;color:var(--ink3);margin-bottom:2px}
+.nbig > div:first-child b{margin-top:15px}
+.amtbox{background:var(--card);border-radius:16px;padding:12px;margin-bottom:14px}
+.amtrow{display:flex;align-items:center;gap:10px}
+.amtrow input{font-size:24px;font-weight:800;padding:10px 12px;flex:1}
+.unitlab{color:var(--ink2);font-weight:700;max-width:40%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chips{display:flex;gap:6px;overflow-x:auto;padding:10px 0 2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chips button{flex:none;padding:8px 14px;border-radius:99px;background:var(--chip);font-size:14px;font-weight:700;color:var(--ink2)}
+.chips button.on{background:var(--ink);color:var(--bg)}
+.rings{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.ring{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px}
+.ring svg{width:52px;height:52px}
+.ring b{position:absolute;top:16px;left:0;right:0;font-size:12px}
+.ring span{font-size:12px;color:var(--ink2);font-weight:600}
+.scgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center}
+.sc{display:flex;flex-direction:column;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink2)}
+.sc span{width:60px;height:60px;border-radius:50%;background:var(--chip);display:grid;place-items:center;color:var(--ink)}
+.sc:active span{background:var(--line)}
 </style>
 </head>
 <body>
@@ -217,7 +257,9 @@ const ICON = {
   save:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',
   upload:'<path d="M12 21V9M7 14l5-5 5 5M5 3h14"/>',
   meal:'<path d="M4 11h16a8 8 0 0 1-16 0zM9 4c0 2 2 2 2 4M14 4c0 2 2 2 2 4"/>',
-  chat:'<path d="M4 5h16v11H9l-5 4z"/>'
+  chat:'<path d="M4 5h16v11H9l-5 4z"/>',
+  check:'<path d="m5 12 5 5 9-10"/>',
+  swap:'<path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/>'
 };
 const svg = (n, cls = 'i') => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true">${ICON[n]}</svg>`;
 
@@ -337,7 +379,7 @@ function targetFor(date) {
 }
 function emojiFor(name, cats) {
   const s = (name + ' ' + (cats || []).join(' ')).toLowerCase();
-  const map = [[/milk|latte/, '🥛'], [/coffee|flat white|espresso|cappuccino/, '☕'], [/tea\b/, '🍵'], [/strawberr|berr/, '🍓'], [/blueberr/, '🫐'], [/banana/, '🍌'], [/apple/, '🍎'], [/orange|mandarin/, '🍊'], [/grape/, '🍇'], [/mango/, '🥭'], [/avocado/, '🥑'], [/oat|porridge|muesli|granola|cereal/, '🥣'], [/protein|shake|powder/, '🥤'], [/tofu/, '🧈'], [/tempeh/, '🟫'], [/bean|chickpea|lentil/, '🫘'], [/rice/, '🍚'], [/pasta|spaghetti|penne|fettuc/, '🍝'], [/noodle|ramen|pho|pad/, '🍜'], [/curry|dal|masala/, '🍛'], [/wrap|burrito/, '🌯'], [/taco/, '🌮'], [/burger/, '🍔'], [/pizza/, '🍕'], [/sandwich|toast|bread|bagel|roll/, '🍞'], [/salad/, '🥗'], [/soup/, '🍲'], [/broccoli|veg/, '🥦'], [/potato|chip/, '🥔'], [/chocolate|cocoa/, '🍫'], [/cookie|biscuit/, '🍪'], [/cake|muffin/, '🧁'], [/ice cream|gelato/, '🍨'], [/yog/, '🥣'], [/nut|almond|cashew|walnut/, '🌰'], [/bar\b|bars/, '🍫'], [/juice/, '🧃'], [/beer/, '🍺'], [/wine/, '🍷'], [/water|soda|cola|drink/, '🥤'], [/cheese/, '🧀'], [/sushi/, '🍣'], [/dumpling|gyoza/, '🥟'], [/corn/, '🌽'], [/tomato/, '🍅'], [/mushroom/, '🍄'], [/pea\b|peas/, '🫛']];
+  const map = [[/milk|latte/, '🥛'], [/coffee|flat white|espresso|cappuccino/, '☕'], [/tea\b/, '🍵'], [/strawberr|berr/, '🍓'], [/blueberr/, '🫐'], [/banana/, '🍌'], [/apple/, '🍎'], [/orange|mandarin/, '🍊'], [/grape/, '🍇'], [/mango/, '🥭'], [/avocado/, '🥑'], [/oat|porridge|muesli|granola|cereal|weet|bix|flakes|bran\b|cheerios/, '🥣'], [/protein|shake|powder/, '🥤'], [/tofu/, '🧈'], [/tempeh/, '🟫'], [/bean|chickpea|lentil/, '🫘'], [/rice/, '🍚'], [/pasta|spaghetti|penne|fettuc/, '🍝'], [/noodle|ramen|pho|pad/, '🍜'], [/curry|dal|masala/, '🍛'], [/wrap|burrito/, '🌯'], [/taco/, '🌮'], [/burger/, '🍔'], [/pizza/, '🍕'], [/sandwich|toast|bread|bagel|roll/, '🍞'], [/salad/, '🥗'], [/soup/, '🍲'], [/broccoli|veg/, '🥦'], [/potato|chip/, '🥔'], [/chocolate|cocoa/, '🍫'], [/cookie|biscuit/, '🍪'], [/cake|muffin/, '🧁'], [/ice cream|gelato/, '🍨'], [/yog/, '🥣'], [/nut|almond|cashew|walnut/, '🌰'], [/bar\b|bars/, '🍫'], [/juice/, '🧃'], [/beer/, '🍺'], [/wine/, '🍷'], [/water|soda|cola|drink/, '🥤'], [/cheese/, '🧀'], [/sushi/, '🍣'], [/dumpling|gyoza/, '🥟'], [/corn/, '🌽'], [/tomato/, '🍅'], [/mushroom/, '🍄'], [/pea\b|peas/, '🫛']];
   for (const [re, e] of map) if (re.test(s)) return e;
   return '🍽️';
 }
@@ -360,7 +402,7 @@ function dockHtml() {
   const n = (v, ic, label) => `<button data-nav="${v}" class="${view === v ? 'cur' : ''}">${svg(ic)}${label}</button>`;
   return `<div class="dock"><div class="dock-in">
     ${view === 'log' ? `<div class="srch"><button class="sb" data-act="search">${svg('search')}<span class="grow">Search for a food</span><span class="bc" data-act="scan" aria-label="Scan barcode">${svg('barcode')}</span></button><button class="qa" data-act="quick" aria-label="Quick add calories">${svg('bolt')}</button></div>` : ''}
-    <nav class="nav" aria-label="Main">${n('dash', 'dash', 'Dashboard')}${n('log', 'log', 'Food Log')}<button data-act="search" aria-label="Log food"><span class="plus">${svg('plus')}</span></button>${n('strat', 'strat', 'Strategy')}${n('more', 'more', 'More')}</nav>
+    <nav class="nav" aria-label="Main">${n('dash', 'dash', 'Dashboard')}${n('log', 'log', 'Food Log')}<button data-act="shortcuts" aria-label="Add"><span class="plus">${svg('plus')}</span></button>${n('strat', 'strat', 'Strategy')}${n('more', 'more', 'More')}</nav>
   </div></div>`;
 }
 
@@ -573,7 +615,7 @@ function moreView() {
     ${item('export', 'save', 'Back up data', 'Save a file you can restore later')}
     ${item('import', 'upload', 'Restore backup')}
     ${item('erase', 'trash', 'Erase all data')}
-  </div><p class="note" style="text-align:center;margin-top:18px">Fuel · version 1 · Foods from Open Food Facts and a built-in list of approximate values</p></div>`;
+  </div><p class="note" style="text-align:center;margin-top:18px">Fuel · version 1 · Generic foods from USDA FoodData Central. Packaged foods from Open Food Facts (ODbL).${fwState.info && fwState.info.built ? ' Food database updated ' + esc(fwState.info.built) + '.' : ''}</p></div>`;
 }
 
 /* ================= binding ================= */
@@ -594,7 +636,8 @@ function bindCommon() {
     if (ds.weight) return openWeight(ds.weight);
     const a = ds.act; ev.stopPropagation();
     if (a === 'scan') { ev.preventDefault(); return openScanner(); }
-    if (a === 'search') return openAdd({time: defaultTime()});
+    if (a === 'search') { addTab = 'search'; return openAdd({time: defaultTime()}); }
+    if (a === 'shortcuts') return openShortcuts();
     if (a === 'quick') return openQuick({time: defaultTime()});
     if (a === 'daymenu') return dayMenu();
     if (a === 'daydetail') return dayDetail();
@@ -618,6 +661,7 @@ const defaultTime = () => selDate === todayStr() ? nowHM() : '12:00';
 const stack = [];
 function sheet(title, body, foot, onMount, opts = {}) {
   const el = document.createElement('div'); el.className = 'sheet'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', title);
+  if (opts.half) { el.classList.add('half'); const bd = document.createElement('div'); bd.className = 'backdrop'; bd.onclick = () => closeSheet(); $('#sheets').appendChild(bd); el._bd = bd; }
   el.innerHTML = `<div class="sh-top"><button class="ib" data-close aria-label="${stack.length ? 'Back' : 'Close'}">${svg(stack.length ? 'back' : 'close')}</button><h2>${esc(title)}</h2>${opts.right || ''}</div><div class="sh-body">${body}</div>${foot ? `<div class="sh-foot">${foot}</div>` : ''}`;
   $('#sheets').appendChild(el); stack.push(el);
   el.querySelector('[data-close]').onclick = () => closeSheet();
@@ -625,7 +669,7 @@ function sheet(title, body, foot, onMount, opts = {}) {
   return el;
 }
 function closeSheet(all) {
-  do { const el = stack.pop(); if (el) el.remove(); } while (all && stack.length);
+  do { const el = stack.pop(); if (el) { el.remove(); if (el._bd) el._bd.remove(); } } while (all && stack.length);
   if (!stack.length) render();
 }
 window.addEventListener('popstate', () => { if (stack.length) closeSheet(); });
@@ -640,76 +684,243 @@ function toast(msg, undo) {
   toastT = setTimeout(() => t.remove(), undo ? 5000 : 2600);
 }
 
+/* ---------- offline food database (search.js worker) ---------- */
+let FW = null, fwSeq = 0;
+const fwWait = {}, fwState = {ready: false, downloading: false, info: null, error: null}, fwListeners = new Set();
+function foodWorker() {
+  if (FW || !window.Worker) return FW;
+  try {
+    FW = new Worker('search.js');
+    FW.onmessage = e => {
+      const m = e.data;
+      if (m.type === 'ready') { fwState.ready = true; fwState.downloading = false; fwState.info = m; }
+      else if (m.type === 'progress') fwState.downloading = true;
+      else if (m.type === 'error') { fwState.error = m.message; fwState.downloading = false; }
+      else if (fwWait[m.seq]) { fwWait[m.seq](m); delete fwWait[m.seq]; return; }
+      fwListeners.forEach(f => f());
+    };
+    FW.onerror = () => { fwState.error = 'worker'; fwListeners.forEach(f => f()); };
+    FW.postMessage({type: 'load'});
+  } catch (e) { FW = null; }
+  return FW;
+}
+function fwAsk(msg) {
+  return new Promise(ok => {
+    const w = foodWorker(); if (!w) return ok(null);
+    const seq = ++fwSeq; fwWait[seq] = ok; w.postMessage(Object.assign({seq}, msg));
+    setTimeout(() => { if (fwWait[seq]) { delete fwWait[seq]; ok(null); } }, 20000);
+  });
+}
+
+/* ---------- units ---------- */
+// Australian metric spoons and cups. USDA portions keep their own labels and gram weights.
+const MASS = [['g', 1], ['oz', 28.35], ['lb', 453.6]];
+const VOL = [['ml', 1], ['tsp', 5], ['tbsp', 20], ['cup', 250], ['fl oz', 29.57]];
+const US_VOL = {cup: 236.6, cups: 236.6, tbsp: 14.79, tablespoon: 14.79, tsp: 4.93, teaspoon: 4.93, 'fl oz': 29.57};
+function isLiquid(f) { return !!f.liquid || (f.servings || []).some(s => /(\d|\b)\s*ml\b|\d\s*l\b|litre|liter/i.test(s.label)); }
+function densityOf(f) { // grams per ml
+  if (isLiquid(f)) return 1;
+  for (const s of f.servings || []) {
+    const m = String(s.label).toLowerCase().match(/^([\d.\/ ]+)\s*(cups?|tbsp|tablespoons?|tsp|teaspoons?|fl oz)\b/);
+    if (m) { const q = parseQty(m[1]); const u = US_VOL[m[2].replace(/s$/, '')] || US_VOL[m[2]]; if (q && u) return s.g / (q * u); }
+  }
+  return null;
+}
+function parseQty(t) { t = String(t).trim(); let n = 0; for (const p of t.split(/\s+/)) { if (p.includes('/')) { const [a, b] = p.split('/').map(Number); if (b) n += a / b; } else if (!isNaN(+p)) n += +p; } return n || null; }
+function unitOptions(f) {
+  const liquid = isLiquid(f), dens = densityOf(f);
+  const o = [];
+  const metric = liquid ? VOL.map(([u, ml]) => ({key: u, label: u, g: ml * dens, metric: true})) : MASS.map(([u, g]) => ({key: u, label: u, g, metric: true}));
+  o.push(...metric.slice(0, liquid ? 1 : 1));
+  (f.servings || []).forEach((s, i) => { if (s.g > 0) o.push({key: 's' + i, label: s.label, g: s.g, chip: shortServing(s.label)}); });
+  const has1 = u => (f.servings || []).some(s => new RegExp('^1\\s*' + u + '\\b', 'i').test(s.label));
+  o.push(...metric.slice(1).filter(u => !has1(u.label)));
+  if (liquid) o.push({key: 'g', label: 'g', g: 1, metric: true});
+  else if (dens) VOL.filter(([u]) => !has1(u)).forEach(([u, ml]) => o.push({key: u, label: u, g: ml * dens, metric: true}));
+  else o.push({key: 'ml', label: 'ml', g: 1, metric: true}); // assume about 1 g per ml
+  return o;
+}
+function shortServing(l) { l = String(l).replace(/\s*\(.*\)\s*/, '').trim(); return l.length > 18 ? l.slice(0, 17) + '…' : l || 'serving'; }
+function findUnit(units, label) { if (label === 'g / ml') label = 'g'; return units.find(u => u.label === label) || units.find(u => u.key === label); }
+function amountLabel(u, amount) { return u.metric ? r1(amount) + ' ' + u.label : (amount === 1 ? u.label : r1(amount) + ' × ' + u.label); }
+function defaultAmount(f) {
+  const units = unitOptions(f); const lu = lastUse(f.id);
+  if (lu) { const u = findUnit(units, lu.unit); if (u) return {unit: u, amt: lu.amount}; }
+  const s = units.find(u => !u.metric); if (s) return {unit: s, amt: 1};
+  return {unit: units[0], amt: 100};
+}
+
 /* ---------- add food ---------- */
-let addTab = 'suggested';
+let addTab = 'search';
+function projectedChip(extraKcal) {
+  const t = targetFor(selDate); const k = sum(dayEntries(selDate)).kcal + (extraKcal || 0);
+  return `<span class="kchip num${k > t.kcal ? ' over' : ''}">${fmt(k)} / ${fmt(t.kcal)}</span>`;
+}
 function openAdd(ctx) {
   const time = ctx.time;
-  sheet('Add food', `<div style="display:flex;gap:8px;margin-bottom:10px"><input id="q" type="search" placeholder="Search foods or brands" autocomplete="off" enterkeyhint="search"><button class="ib" id="scanb" aria-label="Scan barcode" style="width:48px;height:48px">${svg('barcode')}</button></div>
-    <div class="field" style="flex-direction:row;align-items:center;gap:10px;margin-bottom:6px"><label for="atime" style="flex:none">Time</label><input id="atime" type="time" value="${time}" style="max-width:150px;padding:8px 12px"><span class="note">${dayName(selDate)}</span></div>
-    <div class="tabs" id="atabs"></div><div id="ares" class="list"></div>`, '', el => {
+  const basket = [];
+  foodWorker();
+  const right = `<input id="atime" type="time" value="${time}" class="tchip" aria-label="Time">`;
+  sheet('Add food', `<div class="qwrap"><span class="qi">${svg('search')}</span><input id="q" type="search" placeholder="Search foods or brands" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="search"><button class="ib" id="scanb" aria-label="Scan barcode">${svg('barcode')}</button></div>
+    <div class="tabs" id="atabs"></div><div id="dbnote"></div><div id="ares" class="list"></div>`,
+    `<button class="btn sec" id="kc" style="flex:none;padding:0 14px" aria-live="polite"></button><button class="btn" id="logall" disabled>Log foods</button>`, el => {
     const q = $('#q', el), res = $('#ares', el), tabs = $('#atabs', el);
     const getTime = () => $('#atime', el).value || time;
-    $('#scanb', el).onclick = () => openScanner(getTime);
-    const T = [['suggested', 'Suggested'], ['recent', 'Recent'], ['favs', 'Favourites'], ['meals', 'Meals'], ['mine', 'My foods'], ['quick', 'Quick add']];
+    let cache = {};
+    const remember = f => (cache[f.id] = f, f.id);
+    $('#scanb', el).onclick = () => openScanner(getTime, f => addToBasket(f));
+    const T = [['search', 'Search'], ['favs', 'Favourites'], ['meals', 'Meals'], ['mine', 'My foods'], ['quick', 'Quick add']];
     const drawTabs = () => tabs.innerHTML = T.map(([k, l]) => `<button data-t="${k}" class="${addTab === k ? 'on' : ''}">${l}</button>`).join('');
     tabs.onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; if (b.dataset.t === 'quick') return openQuick({time: getTime()}); addTab = b.dataset.t; drawTabs(); draw(); };
-    const foodRow = (f, extra) => `<button class="food" data-food="${f.id}"><span class="ic">${esc(f.emoji || '🍽️')}</span><span class="fi"><span class="nm">${esc(f.name)}</span><span class="row-sub">${esc([f.brand, extra || servingSummary(f)].filter(Boolean).join(' · '))}</span></span><span class="ed">${svg('plus')}</span></button>`;
+
+    function drawFoot() {
+      const k = basket.reduce((n, x) => n + x.kcal, 0);
+      $('#kc', el).innerHTML = projectedChip(k);
+      const lb = $('#logall', el); lb.disabled = !basket.length;
+      lb.textContent = basket.length ? `Log ${basket.length} food${basket.length === 1 ? '' : 's'} · ${fmt(k)} kcal` : 'Log foods';
+    }
+    function addToBasket(f, unit, amt, keep) {
+      if (!unit) ({unit, amt} = defaultAmount(f));
+      const g = amt * unit.g; if (!(g > 0)) return;
+      basket.push(Object.assign({id: uid(), foodId: f.id, name: f.name, brand: f.brand || '', emoji: f.emoji || emojiFor(f.name), amount: amt, unit: unit.label, grams: g, label: amountLabel(unit, amt), _food: f}, nutr(f, g)));
+      drawFoot(); if (!keep) draw();
+      toast(`Added ${f.name}`, () => { basket.pop(); drawFoot(); draw(); });
+    }
+    const inBasket = id => basket.some(x => x.foodId === id);
+    const foodRow = (f, sub) => `<div class="food srow"><button class="srow-main" data-food="${remember(f)}"><span class="ic">${esc(f.emoji || emojiFor(f.name))}</span><span class="fi"><span class="nm">${hl(f.name)}</span><span class="mx num">${macroLine(f)}</span>${sub || f.brand ? `<span class="row-sub">${esc(sub || f.brand)}</span>` : ''}</span></button><button class="ed addb${inBasket(f.id) ? ' on' : ''}" data-plus="${f.id}" aria-label="Add ${esc(f.name)}">${svg(inBasket(f.id) ? 'check' : 'plus')}</button></div>`;
+    const entryRowHtml = (e, sub) => `<div class="food srow"><button class="srow-main" data-sug="${esc(e.id)}"><span class="ic">${esc(e.emoji || '🍽️')}</span><span class="fi"><span class="nm">${esc(e.name)}</span><span class="mx num"><span class="k">${fmt(e.kcal)} kcal</span><span class="m P">${r0(e.p)}P</span><span class="m F">${r0(e.f)}F</span><span class="m C">${r0(e.c)}C</span><span>${esc(e.label || '')}</span></span>${sub ? `<span class="row-sub">${esc(sub)}</span>` : ''}</span></button><button class="ed addb" data-sugplus="${esc(e.id)}" aria-label="Add ${esc(e.name)}">${svg('plus')}</button></div>`;
+    let terms = [];
+    const hl = name => { let h = esc(name); if (!terms.length) return h; const re = new RegExp('(' + terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi'); return h.replace(re, '<b class="hit">$1</b>'); };
+    function macroLine(f) {
+      const {unit, amt} = defaultAmount(f); const n = nutr(f, unit.g * amt);
+      return `<span class="k">${fmt(n.kcal)} kcal</span><span class="m P">${r0(n.p)}P</span><span class="m F">${r0(n.f)}F</span><span class="m C">${r0(n.c)}C</span><span>${esc(amountLabel(unit, amt))}</span>`;
+    }
     function draw() {
-      const term = q.value.trim().toLowerCase();
-      if (term) return search(term);
+      const term = q.value.trim();
+      if (term) { addTab === 'search' || (addTab = 'search', drawTabs()); return search(term); }
+      terms = [];
       let h = '';
-      if (addTab === 'suggested') {
-        const sg = suggestions(selDate, mins(getTime()), 12, 90);
-        h = sg.length ? sg.map(s => { const e = s.last; return `<button class="food" data-sug="${esc(s.last.id)}"><span class="ic">${esc(e.emoji || '🍽️')}</span><span class="fi"><span class="nm">${esc(e.name)}</span><span class="row-sub">${fmt(e.kcal)} kcal · ${esc(e.label || '')} · usually ~${timeLabel(s.typical)} · ${s.count}×</span></span><span class="ed">${svg('plus')}</span></button>`; }).join('') : '<p class="note">Suggestions appear once you have logged foods at this time of day a couple of times. Search, scan or pick from Recent for now.</p>';
-      } else if (addTab === 'recent') {
-        const seen = new Set(); const rec = [];
+      if (addTab === 'search') {
+        const sg = suggestions(selDate, mins(getTime()), 6, 90).filter(s => s.count >= 2);
+        if (sg.length) h += `<div class="sec-h">Picks for ${timeLabel(getTime())}</div>` + sg.map(s => entryRowHtml(s.last, `usually ~${timeLabel(s.typical)} · ${s.count}×`)).join('');
+        const seen = new Set(sg.map(s => s.key)); const rec = [];
         [...S.entries].sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).forEach(e => { const k = e.foodId || 'q:' + e.name; if (!seen.has(k) && rec.length < 30) { seen.add(k); rec.push(e); } });
-        h = rec.length ? rec.map(e => `<button class="food" data-sug="${esc(e.id)}"><span class="ic">${esc(e.emoji || '🍽️')}</span><span class="fi"><span class="nm">${esc(e.name)}</span><span class="row-sub">${fmt(e.kcal)} kcal · ${esc(e.label || '')}</span></span><span class="ed">${svg('plus')}</span></button>`).join('') : '<p class="note">Foods you log will show here.</p>';
+        h += rec.length ? `<div class="sec-h">Latest</div>` + rec.map(e => entryRowHtml(e)).join('') : (sg.length ? '' : '<p class="note">Search above, or scan a barcode. Foods you log will show here for one-tap logging.</p>');
       } else if (addTab === 'favs') {
         const fs = S.favs.map(id => S.foods[id]).filter(Boolean);
         h = fs.length ? fs.map(f => foodRow(f)).join('') : '<p class="note">Tap the star on any food to add it here.</p>';
       } else if (addTab === 'meals') {
         h = S.meals.length ? S.meals.map(m => { const t = sum(m.items); return `<button class="food" data-meal="${m.id}"><span class="ic">${esc(m.emoji || '🍱')}</span><span class="fi"><span class="nm">${esc(m.name)}</span><span class="row-sub">${m.items.length} items · ${fmt(t.kcal)} kcal · ${r0(t.p)}P</span></span><span class="ed">${svg('plus')}</span></button>`; }).join('') : '<p class="note">To save a meal, tap the hour total on your log (for example "578 kcal · 39P...") and choose Save as meal.</p>';
       } else if (addTab === 'mine') {
-        const fs = Object.values(S.foods).filter(f => f.source === 'custom' || f.source === 'off').sort((a, b) => a.name.localeCompare(b.name));
+        const fs = Object.values(S.foods).filter(f => f.source !== 'builtin').sort((a, b) => a.name.localeCompare(b.name));
         h = `<button class="menu-item" data-newfood>${svg('plus')}<span>Create a food<small>Enter it from a nutrition label</small></span></button>` + fs.map(f => foodRow(f)).join('');
       }
-      res.innerHTML = h;
+      res.innerHTML = h; dbNote();
     }
-    let sTimer, sSeq = 0;
-    function search(term) {
-      const words = term.split(/\s+/);
-      const local = Object.values(S.foods).filter(f => { const s = (f.name + ' ' + (f.brand || '')).toLowerCase(); return words.every(w => s.includes(w)); })
-        .sort((a, b) => useCount(b.id) - useCount(a.id)).slice(0, 25);
-      res.innerHTML = (local.length ? `<div class="sec-h">Your foods</div>` + local.map(f => foodRow(f)).join('') : '') + `<div class="sec-h">Open Food Facts</div><div id="offres" class="list"><p class="note"><span class="spin"></span> Searching…</p></div>`;
-      clearTimeout(sTimer); const seq = ++sSeq;
-      sTimer = setTimeout(async () => {
-        const box = $('#offres', el); if (!box) return;
-        if (!navigator.onLine) { box.innerHTML = '<p class="note">Offline. Only your saved foods are searchable.</p>'; return; }
-        try {
-          const items = await offSearch(term); if (seq !== sSeq) return;
-          offCache = {}; items.forEach(f => offCache[f.id] = f);
-          box.innerHTML = items.length ? items.map(f => foodRow(f, (f.per100.kcal != null ? r0(f.per100.kcal) + ' kcal/100g' : ''))).join('') : '<p class="note">No matches. Try fewer words, scan the barcode, or create the food.</p>';
-        } catch (e) { if (seq === sSeq) box.innerHTML = '<p class="note">Open Food Facts didn\'t respond. Try again in a moment.</p>'; }
-      }, 450);
+    function dbNote() {
+      const n = $('#dbnote', el); if (!n) return;
+      n.innerHTML = fwState.ready || !q.value.trim() ? '' : fwState.downloading ? '<p class="note"><span class="spin"></span> Downloading the food database. This happens once, then search works instantly and offline.</p>' : fwState.error ? '<p class="note">The food database couldn\'t load, so search is using Open Food Facts online.</p>' : '';
     }
+    let sSeq = 0, showAllCommon = false, lastTerm = '';
+    function localMatches(term) {
+      const words = norm1(term).split(' ').filter(Boolean);
+      const hay = f => norm1(f.name + ' ' + (f.brand || ''));
+      return Object.values(S.foods).filter(f => { const h = ' ' + hay(f); return words.every(w => h.includes(' ' + w) || (w.length >= 4 && h.includes(w.slice(0, -1)))); })
+        .map(f => [f, useCount(f.id)]).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    }
+    async function search(term) {
+      if (term !== lastTerm) showAllCommon = false; lastTerm = term;
+      const seq = ++sSeq;
+      const local = localMatches(term);
+      const localIds = new Set(local.map(([f]) => f.id));
+      const head = local.length ? `<div class="sec-h">Your foods</div>` + local.map(([f, n]) => foodRow(f, n ? `${f.brand ? f.brand + ' · ' : ''}logged ${n}×` : '')).join('') : '';
+      if (!fwState.ready && (fwState.error || !FW)) return remote(term, seq, head);
+      if (!fwState.ready) { res.innerHTML = head + `<div id="offres" class="list"></div>`; dbNote(); return remote(term, seq, head); }
+      const r = await fwAsk({type: 'search', q: term, limit: 40});
+      if (seq !== sSeq || !r) return;
+      terms = (term.toLowerCase().match(/[a-z0-9]{2,}/g) || []);
+      const com = r.common.filter(f => !localIds.has(f.id)), br = r.au.filter(f => !localIds.has(f.id));
+      const nCom = showAllCommon ? com.length : 4;
+      let h = head;
+      const comH = com.length ? `<div class="sec-h sug-h"><span>Common</span>${com.length > nCom ? `<button class="link" data-more>See ${com.length - nCom} more</button>` : ''}</div>` + com.slice(0, nCom).map(f => foodRow(f)).join('') : '';
+      const brH = br.length ? `<div class="sec-h">Branded</div>` + br.slice(0, 30).map(f => foodRow(f, [f.brand, f.warn && f.warn[0]].filter(Boolean).join(' · '))).join('') : '';
+      h += r.brandedFirst ? brH + comH : comH + brH;
+      if (!com.length && !br.length && !local.length) h += '<p class="note">No matches in the food database.</p>';
+      h += `<div id="offres" class="list"><button class="btn sec" data-online style="margin-top:6px">${svg('search')}Search Open Food Facts online</button></div>`;
+      res.innerHTML = h; dbNote();
+    }
+    async function remote(term, seq, head) {
+      const box = () => $('#offres', el);
+      if (!box()) res.insertAdjacentHTML('beforeend', '<div id="offres" class="list"></div>');
+      box().innerHTML = '<p class="note"><span class="spin"></span> Searching Open Food Facts…</p>';
+      if (!navigator.onLine) { box().innerHTML = '<p class="note">Offline. Only foods you have used are searchable until the food database has downloaded.</p>'; return; }
+      try {
+        const items = await offSearch(term); if (seq !== sSeq || !box()) return;
+        box().innerHTML = (items.length ? '<div class="sec-h">Open Food Facts</div>' + items.map(f => foodRow(f, f.brand)).join('') : '<p class="note">No matches online either. Scan the barcode or create the food.</p>');
+      } catch (e) { if (seq === sSeq && box()) box().innerHTML = '<p class="note">Open Food Facts didn\'t respond. Try again in a moment.</p>'; }
+    }
+    const onDb = () => { if (q.value.trim()) search(q.value.trim()); else dbNote(); };
+    fwListeners.add(onDb);
+    const obs = new MutationObserver(() => { if (!el.isConnected) { fwListeners.delete(onDb); obs.disconnect(); } }); obs.observe($('#sheets'), {childList: true});
     q.oninput = draw;
+    $('#atime', el).onchange = () => { if (!q.value.trim()) draw(); };
     res.onclick = e => {
-      const b = e.target.closest('[data-food],[data-sug],[data-meal],[data-newfood]'); if (!b) return;
-      if (b.dataset.newfood != null) return editFood(null, null, f => openFood(f, {time: getTime()}));
-      if (b.dataset.food) { const f = S.foods[b.dataset.food] || offCache[b.dataset.food]; return openFood(f, {time: getTime()}); }
-      if (b.dataset.sug) return logSuggestion(b.dataset.sug, getTime(), true);
-      if (b.dataset.meal) return logMeal(b.dataset.meal, getTime());
+      const b = e.target.closest('[data-food],[data-plus],[data-sug],[data-sugplus],[data-meal],[data-newfood],[data-more],[data-online]'); if (!b) return;
+      const d = b.dataset;
+      if (d.more != null) { showAllCommon = true; return search(q.value.trim()); }
+      if (d.online != null) return remote(q.value.trim(), sSeq, '');
+      if (d.newfood != null) return editFood(null, null, f => openFood(f, {time: getTime(), onAdd: addToBasket}));
+      if (d.food) { const f = cache[d.food] || S.foods[d.food]; return openFood(f, {time: getTime(), onAdd: addToBasket, basketKcal: () => basket.reduce((n, x) => n + x.kcal, 0)}); }
+      if (d.plus) { const f = cache[d.plus] || S.foods[d.plus]; if (f) addToBasket(f); return; }
+      if (d.sug || d.sugplus) {
+        const src = S.entries.find(x => x.id === (d.sug || d.sugplus)); if (!src) return;
+        const f = src.foodId && S.foods[src.foodId];
+        if (d.sug && f) return openFood(f, {time: getTime(), onAdd: addToBasket, basketKcal: () => basket.reduce((n, x) => n + x.kcal, 0)});
+        basket.push(Object.assign({}, src, {id: uid()})); drawFoot(); toast(`Added ${src.name}`, () => { basket.pop(); drawFoot(); }); return;
+      }
+      if (d.meal) return logMeal(d.meal, getTime());
     };
-    drawTabs(); draw();
-  });
+    $('#logall', el).onclick = () => {
+      if (!basket.length) return;
+      const t = getTime();
+      const recs = basket.map(x => { if (x._food && !S.foods[x.foodId]) S.foods[x.foodId] = Object.assign({}, x._food, {emoji: x._food.emoji || x.emoji}); const r = Object.assign({}, x, {id: uid(), date: selDate, time: t}); delete r._food; return r; });
+      S.entries.push(...recs); dirty(selDate); closeSheet(true);
+      toast(`Logged ${recs.length} food${recs.length === 1 ? '' : 's'}`, () => { const ids = new Set(recs.map(r => r.id)); S.entries = S.entries.filter(x => !ids.has(x.id)); dirty(selDate); render(); });
+    };
+    drawTabs(); draw(); drawFoot();
+    setTimeout(() => q.focus(), 60);
+  }, {right});
 }
-let offCache = {};
+const norm1 = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 const useCount = id => S.entries.reduce((n, e) => n + (e.foodId === id), 0);
 function servingSummary(f) {
   const s = f.servings && f.servings[0]; const p = f.per100 || {};
   if (s) return `${s.label} · ${r0(p.kcal * s.g / 100)} kcal`;
   return p.kcal != null ? r0(p.kcal) + ' kcal/100g' : '';
+}
+
+/* ---------- shortcuts (the + button) ---------- */
+function openShortcuts() {
+  const time = defaultTime();
+  const big = (act, ic, label) => `<button class="sc" data-sc="${act}"><span>${svg(ic)}</span>${label}</button>`;
+  sheet('Shortcuts', `<div class="scgrid">${big('search', 'search', 'Search')}${big('scan', 'barcode', 'Barcode')}${big('quick', 'bolt', 'Quick add')}${big('weight', 'scale', 'Weight')}</div>
+    <div class="list" style="margin-top:14px">
+      <button class="menu-item" data-sc="meals">${svg('meal')}<span>Saved meals<small>${S.meals.length} saved</small></span></button>
+      <button class="menu-item" data-sc="copy">${svg('copy')}<span>Copy yesterday<small>${dayEntries(addDays(selDate, -1)).length} entries into ${dayName(selDate).toLowerCase()}</small></span></button>
+      <button class="menu-item" data-sc="newfood">${svg('pen')}<span>Create a food<small>From a nutrition label</small></span></button>
+    </div>`, '', el => {
+    el.querySelector('.sh-body').onclick = e => {
+      const b = e.target.closest('[data-sc]'); if (!b) return; const a = b.dataset.sc;
+      closeSheet(true);
+      if (a === 'search') { addTab = 'search'; openAdd({time}); }
+      else if (a === 'scan') openScanner(() => time);
+      else if (a === 'quick') openQuick({time});
+      else if (a === 'weight') openWeight();
+      else if (a === 'meals') { addTab = 'meals'; openAdd({time}); }
+      else if (a === 'newfood') editFood(null, null, f => openFood(f, {time}));
+      else if (a === 'copy') { const prev = dayEntries(addDays(selDate, -1)); if (!prev.length) return toast('Nothing logged the day before'); const r = copyEntries(prev, selDate); render(); toast(`Copied ${r.length} entries`, () => { const ids = new Set(r.map(x => x.id)); S.entries = S.entries.filter(x => !ids.has(x.id)); dirty(selDate); render(); }); }
+    };
+ }, {half: true});
 }
 
 /* ---------- Open Food Facts ---------- */
@@ -750,50 +961,91 @@ async function offBarcode(code) {
 }
 
 /* ---------- food detail / log ---------- */
-function unitOptions(f) {
-  const o = (f.servings || []).map((s, i) => ({key: 's' + i, label: s.label, g: s.g}));
-  o.push({key: 'g', label: 'g / ml', g: 1});
-  return o;
-}
 function lastUse(foodId) { return [...S.entries].filter(e => e.foodId === foodId).sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time))[0]; }
 function nutrBlock(n) {
-  return `<div class="nbig"><div><b class="num">${fmt(n.kcal)}</b><span>kcal</span></div><div><b class="num" style="color:var(--p)">${r1(n.p)}</b><span>Protein</span></div><div><b class="num" style="color:var(--f)">${r1(n.f)}</b><span>Fat</span></div><div><b class="num" style="color:var(--c)">${r1(n.c)}</b><span>Carbs</span></div></div>
-  <div class="ntable">${MICROS.map(([k, l, u]) => `<div><span>${l}</span><b class="num">${n[k] != null ? (u === 'mg' ? fmt(n[k]) : r1(n[k])) + ' ' + u : '–'}</b></div>`).join('')}</div>`;
+  const tk = n.p * 4 + n.f * 9 + n.c * 4 || 1;
+  const pc = v => `<i class="pct">${r0(v / tk * 100)}%</i>`;
+  return `<div class="nbig"><div><b class="num">${fmt(n.kcal)}</b><span>kcal</span></div><div>${pc(n.p * 4)}<b class="num" style="color:var(--p)">${r1(n.p)}</b><span>Protein</span></div><div>${pc(n.f * 9)}<b class="num" style="color:var(--f)">${r1(n.f)}</b><span>Fat</span></div><div>${pc(n.c * 4)}<b class="num" style="color:var(--c)">${r1(n.c)}</b><span>Carbs</span></div></div>`;
+}
+function impactBlock(n, date) {
+  const t = targetFor(date);
+  const ring = (v, tg, label, col) => { const p = Math.min(1, v / tg); const C = 2 * Math.PI * 17; return `<div class="ring"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="var(--line)" stroke-width="4"/><circle cx="20" cy="20" r="17" fill="none" stroke="${col}" stroke-width="4" stroke-linecap="round" stroke-dasharray="${(p * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 20 20)"/></svg><b class="num">${r0(v / tg * 100)}%</b><span>${label}</span></div>`; };
+  return `<div class="card"><h3>Impact on targets</h3><div class="rings">${ring(n.kcal, t.kcal, 'Calories', 'var(--acc)')}${ring(n.p, t.p, 'Protein', 'var(--p)')}${ring(n.f, t.f, 'Fat', 'var(--f)')}${ring(n.c, t.c, 'Carbs', 'var(--c)')}</div></div>`;
+}
+function microTable(n) {
+  return `<div class="ntable">${MICROS.map(([k, l, u]) => `<div><span>${l}</span><b class="num">${n[k] != null ? (u === 'mg' ? fmt(n[k]) : r1(n[k])) + ' ' + u : '–'}</b></div>`).join('')}</div>`;
 }
 function openFood(f, ctx, entry) {
   if (!f) return;
+  if (!f.emoji) f.emoji = emojiFor(f.name);
   const units = unitOptions(f);
   let unit, amt;
-  if (entry) { unit = units.find(u => u.label === entry.unit) || units[units.length - 1]; amt = entry.amount; }
-  else { const lu = lastUse(f.id); if (lu) { unit = units.find(u => u.label === lu.unit) || units[0]; amt = lu.amount; } else { unit = units[0]; amt = unit.key === 'g' ? 100 : 1; } }
+  if (entry) { unit = findUnit(units, entry.unit) || units[0]; amt = entry.amount; if (!findUnit(units, entry.unit) && entry.grams) { unit = units.find(u => u.key === 'g') || units[0]; amt = r1(entry.grams / unit.g); } }
+  else ({unit, amt} = defaultAmount(f));
+  let mode = 'amt'; // or kcal, p, f, c: type the target and the grams are worked out
   const isFav = () => S.favs.includes(f.id);
-  const right = `<button class="ib star${isFav() ? ' on' : ''}" id="fav" aria-label="Favourite">${svg('star')}</button>${f.source !== 'builtin' ? `<button class="ib" id="editf" aria-label="Edit food">${svg('pen')}</button>` : ''}`;
-  sheet(entry ? 'Edit entry' : f.name, `
-    ${entry ? `<div class="nm" style="font-size:20px;margin-bottom:2px">${esc(f.emoji)} ${esc(f.name)}</div>` : `<div style="font-size:40px;line-height:1;margin:2px 0 6px">${esc(f.emoji || '🍽️')}</div>`}
-    ${f.brand ? `<div class="note" style="margin-bottom:10px">${esc(f.brand)}${f.barcode ? ' · ' + esc(f.barcode) : ''}</div>` : ''}
+  const right = `<button class="ib star${isFav() ? ' on' : ''}" id="fav" aria-label="Favourite">${svg('star')}</button>${f.source !== 'builtin' && f.source !== 'usda' ? `<button class="ib" id="editf" aria-label="Edit food">${svg('pen')}</button>` : ''}`;
+  const srcNote = {off: 'Values from Open Food Facts, per 100 g scaled to your amount. Check the label if something looks off.', usda: 'Generic values from USDA FoodData Central.', builtin: 'Approximate values from the built-in list.'}[f.source] || '';
+  sheet(entry ? 'Edit entry' : 'Food', `
+    <div class="fhead"><span class="ic big">${esc(f.emoji)}</span><div><div class="nm" style="font-size:19px">${esc(f.name)}</div>${f.brand || f.barcode ? `<div class="note">${esc([f.brand, f.barcode].filter(Boolean).join(' · '))}</div>` : ''}</div></div>
     ${(f.warn || []).map(w => `<div class="warnbox">⚠ ${esc(w)}</div>`).join('')}
     ${f.incomplete ? '<div class="warnbox">This product has no calorie data on Open Food Facts. Edit it to add the label values.</div>' : ''}
-    <div class="two"><div class="field"><label for="amt">Amount</label><input id="amt" type="number" inputmode="decimal" step="any" min="0" value="${amt}"></div>
-    <div class="field"><label for="unit">Unit</label><select id="unit">${units.map(u => `<option value="${u.key}"${u.key === unit.key ? ' selected' : ''}>${esc(u.label)}${u.key !== 'g' ? ` (${u.g} g)` : ''}</option>`).join('')}</select></div></div>
+    <div id="nb"></div>
+    <div class="amtbox">
+      <div class="amtrow"><button class="ib" id="swap" aria-label="Enter calories or macros instead">${svg('swap')}</button><input id="amt" type="text" inputmode="decimal" autocomplete="off" aria-label="Amount"><span class="unitlab" id="ulab"></span></div>
+      <div class="chips" id="chips"></div>
+      <div class="note" id="gnote"></div>
+    </div>
     <div class="two"><div class="field"><label for="ftime">Time</label><input id="ftime" type="time" value="${entry ? entry.time : ctx.time}"></div>
     <div class="field"><label for="fdate">Day</label><input id="fdate" type="date" value="${entry ? entry.date : selDate}"></div></div>
-    <div id="nb"></div>
-    ${f.source === 'off' ? '<p class="note">Values from Open Food Facts, per 100 g scaled to your amount. Check the label if something looks off.</p>' : f.source === 'builtin' ? '<p class="note">Approximate values from the built-in list.</p>' : ''}`,
-    entry ? `<button class="btn danger" id="del" style="flex:none;width:56px" aria-label="Delete entry">${svg('trash')}</button><button class="btn sec" id="dup" style="flex:none;width:56px" aria-label="Duplicate entry">${svg('copy')}</button><button class="btn" id="go">Save</button>` : `<button class="btn" id="go">Log food</button>`,
+    <div id="imp"></div><div id="mt"></div>
+    <p class="note">${srcNote}</p>`,
+    entry ? `<button class="btn danger" id="del" style="flex:none;width:56px" aria-label="Delete entry">${svg('trash')}</button><button class="btn sec" id="dup" style="flex:none;width:56px" aria-label="Duplicate entry">${svg('copy')}</button><button class="btn" id="go">Save</button>`
+      : (ctx.onAdd ? `<button class="btn sec" id="addl">Add to list</button><button class="btn" id="go">Log now</button>` : `<button class="btn" id="go">Log food</button>`),
     el => {
-      const grams = () => { const u = units.find(x => x.key === $('#unit', el).value); return (+$('#amt', el).value || 0) * u.g; };
-      const upd = () => $('#nb', el).innerHTML = nutrBlock(nutr(f, grams()));
-      $('#amt', el).oninput = upd; $('#unit', el).onchange = () => { const u = units.find(x => x.key === $('#unit', el).value); $('#amt', el).value = u.key === 'g' ? r0(grams()) || 100 : 1; upd(); }; upd();
+      const inp = $('#amt', el);
+      const per1g = nutr(f, 1);
+      const KEYS = {kcal: ['kcal', 'kcal'], p: ['P', 'g protein'], f: ['F', 'g fat'], c: ['C', 'g carbs']};
+      const val = () => parseQty(inp.value.replace(',', '.')) || 0;
+      const grams = () => mode === 'amt' ? val() * unit.g : (per1g[mode] > 0 ? val() / per1g[mode] : 0);
+      const drawChips = () => {
+        $('#chips', el).innerHTML = mode === 'amt' ? units.map(u => `<button data-u="${u.key}" class="${u.key === unit.key ? 'on' : ''}">${esc(u.chip || u.label)}</button>`).join('')
+          : Object.entries(KEYS).map(([k, [l]]) => `<button data-m="${k}" class="${k === mode ? 'on' : ''}">${l}</button>`).join('');
+        $('#ulab', el).textContent = mode === 'amt' ? (unit.metric ? unit.label : '× ' + shortServing(unit.label)) : KEYS[mode][1];
+      };
+      const upd = () => {
+        const g = grams(); const n = nutr(f, g);
+        $('#nb', el).innerHTML = nutrBlock(n);
+        $('#imp', el).innerHTML = impactBlock(n, $('#fdate', el).value || selDate);
+        $('#mt', el).innerHTML = microTable(n);
+        $('#gnote', el).textContent = mode !== 'amt' ? `= ${r0(g)} g${unit.metric ? '' : ' (' + r1(g / unit.g) + ' × ' + shortServing(unit.label) + ')'}` : (!unit.metric || unit.key !== 'g') ? `${r0(g)} g` : '';
+      };
+      inp.value = r1(amt); drawChips(); upd();
+      inp.oninput = upd; $('#fdate', el).onchange = upd;
+      inp.onfocus = () => inp.select();
+      $('#chips', el).onclick = e => {
+        const b = e.target.closest('button'); if (!b) return;
+        const g = grams();
+        if (b.dataset.u) { unit = units.find(u => u.key === b.dataset.u); inp.value = g > 0 ? r1(unit.metric ? g / unit.g : Math.max(0.25, Math.round(g / unit.g * 4) / 4)) : (unit.metric ? 100 : 1); }
+        else { mode = b.dataset.m; inp.value = r0(per1g[mode] * g); }
+        drawChips(); upd();
+      };
+      $('#swap', el).onclick = () => {
+        const g = grams();
+        if (mode === 'amt') { mode = 'kcal'; inp.value = r0(per1g.kcal * g); }
+        else { mode = 'amt'; inp.value = Math.round(g / unit.g * 100) / 100; }
+        drawChips(); upd(); inp.focus();
+      };
       $('#fav', el).onclick = () => { if (isFav()) S.favs = S.favs.filter(x => x !== f.id); else { if (!S.foods[f.id]) S.foods[f.id] = f; S.favs.push(f.id); } save(); $('#fav', el).classList.toggle('on', isFav()); };
       const ef = $('#editf', el); if (ef) ef.onclick = () => editFood(f, null, nf => { closeSheet(); openFood(nf, ctx, entry); });
+      const final = () => { const g = grams(); const a = mode === 'amt' ? val() : Math.round(g / unit.g * 100) / 100; return {g: mode === 'amt' ? g : a * unit.g, a}; };
+      const addl = $('#addl', el);
+      if (addl) addl.onclick = () => { const {g, a} = final(); if (!(g > 0)) return toast('Enter an amount'); closeSheet(); ctx.onAdd(f, unit, a, false); };
       $('#go', el).onclick = () => {
-        const g = grams(); if (!(g > 0)) return toast('Enter an amount');
-        const u = units.find(x => x.key === $('#unit', el).value);
+        const {g, a} = final(); if (!(g > 0)) return toast('Enter an amount');
         if (!S.foods[f.id]) S.foods[f.id] = f;
         const time = $('#ftime', el).value || ctx.time, date = $('#fdate', el).value || selDate;
-        const amount = +$('#amt', el).value;
-        const label = u.key === 'g' ? r0(amount) + ' g' : (amount === 1 ? u.label : r1(amount) + ' × ' + u.label);
-        const rec = Object.assign({id: entry ? entry.id : uid(), date, time, foodId: f.id, name: f.name, brand: f.brand || '', emoji: f.emoji || '🍽️', amount, unit: u.label, grams: g, label}, nutr(f, g));
+        const rec = Object.assign({id: entry ? entry.id : uid(), date, time, foodId: f.id, name: f.name, brand: f.brand || '', emoji: f.emoji || '🍽️', amount: a, unit: unit.label, grams: g, label: amountLabel(unit, a)}, nutr(f, g));
         if (entry) { const old = entry.date; S.entries = S.entries.map(x => x.id === entry.id ? rec : x); dirty(old); dirty(date); closeSheet(true); toast('Saved'); }
         else { S.entries.push(rec); dirty(date); selDate = date; closeSheet(true); toast(`Logged ${f.name}`, () => { S.entries = S.entries.filter(x => x.id !== rec.id); dirty(date); render(); }); }
       };
@@ -887,7 +1139,7 @@ function editFood(f, barcode, after) {
 
 /* ---------- barcode scanner ---------- */
 let scanStream = null, scanLoop = null, zxReader = null;
-async function openScanner(getTime) {
+async function openScanner(getTime, onAdd) {
   const time = typeof getTime === 'function' ? getTime() : defaultTime();
   const el = document.createElement('div'); el.id = 'scan';
   el.innerHTML = `<video playsinline muted autoplay></video><div class="frame"></div><div class="msg" id="smsg">Point the camera at a barcode</div>
@@ -898,7 +1150,7 @@ async function openScanner(getTime) {
   let done = false;
   const found = async code => {
     if (done) return; done = true; if (navigator.vibrate) navigator.vibrate(40);
-    stop(); await handleBarcode(String(code).trim(), time);
+    stop(); await handleBarcode(String(code).trim(), time, onAdd);
   };
   $('#sclose', el).onclick = stop;
   $('#mgo', el).onclick = () => { const c = $('#manual', el).value.replace(/\D/g, ''); if (c.length >= 6) found(c); else toast('Enter the full barcode'); };
@@ -923,17 +1175,19 @@ async function openScanner(getTime) {
   }
 }
 function loadScript(src) { return new Promise((ok, bad) => { if ([...document.scripts].some(s => s.src === src)) return ok(); const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = bad; document.head.appendChild(s); }); }
-async function handleBarcode(code, time) {
+async function handleBarcode(code, time, onAdd) {
+  const ctx = {time, onAdd};
   const local = Object.values(S.foods).find(f => f.barcode === code);
-  if (local) return openFood(local, {time});
+  if (local) return openFood(local, ctx);
+  if (fwState.ready) { const r = await fwAsk({type: 'barcode', code}); if (r && r.food) return openFood(r.food, ctx); }
   if (!navigator.onLine) { toast('Offline, and this barcode isn\'t saved yet'); return editFood(null, code, f => openFood(f, {time})); }
   toast('Looking up ' + code + '…');
   try {
     const f = await offBarcode(code);
-    if (f) { if (f.incomplete) return editFood(f, code, nf => openFood(nf, {time})); return openFood(f, {time}); }
+    if (f) { if (f.incomplete) return editFood(f, code, nf => openFood(nf, ctx)); return openFood(f, ctx); }
   } catch (e) {}
   toast('Not found. Add it from the label.');
-  editFood(null, code, f => openFood(f, {time}));
+  editFood(null, code, f => openFood(f, ctx));
 }
 
 /* ---------- day + hour menus ---------- */
@@ -989,10 +1243,10 @@ function dayDetail() {
 function openWeight(date) {
   const ex = date ? S.weights.find(w => w.date === date) : S.weights.find(w => w.date === todayStr());
   const last = [...S.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
-  sheet('Log weight', `<div class="two"><div class="field"><label for="wk">Weight (kg)</label><input id="wk" type="number" inputmode="decimal" step="0.1" value="${ex ? ex.kg : (last ? last.kg : '')}"></div><div class="field"><label for="wd">Day</label><input id="wd" type="date" value="${ex ? ex.date : todayStr()}"></div></div><p class="note">Weigh in the morning after the toilet, before eating. The trend smooths out day-to-day water changes.</p>`,
+  sheet('Log weight', `<div class="field"><label for="wd">Day</label><input id="wd" type="date" value="${ex ? ex.date : todayStr()}"></div><div class="two"><div class="field"><label for="wk">Weight (kg)</label><input id="wk" type="number" inputmode="decimal" step="0.1" value="${ex ? ex.kg : (last ? last.kg : '')}"></div><div class="field"><label for="wbf">Body fat % (optional)</label><input id="wbf" type="number" inputmode="decimal" step="0.1" value="${ex && ex.bf != null ? ex.bf : ''}"></div></div><p class="note">Weigh in the morning after the toilet, before eating. The trend smooths out day-to-day water changes.</p>`,
     (ex ? `<button class="btn danger" id="del" style="flex:none;width:56px" aria-label="Delete weigh-in">${svg('trash')}</button>` : '') + `<button class="btn" id="go">Save</button>`, el => {
       $('#wk', el).focus(); $('#wk', el).select();
-      $('#go', el).onclick = () => { const kg = +$('#wk', el).value; const d = $('#wd', el).value; if (!(kg > 30 && kg < 300) || !d) return toast('Enter a weight in kg'); S.weights = S.weights.filter(w => w.date !== d && (!ex || w.date !== ex.date)); S.weights.push({date: d, kg: r1(kg)}); dirty(null); closeSheet(); toast('Weight saved'); };
+      $('#go', el).onclick = () => { const kg = +$('#wk', el).value; const d = $('#wd', el).value; if (!(kg > 30 && kg < 300) || !d) return toast('Enter a weight in kg'); S.weights = S.weights.filter(w => w.date !== d && (!ex || w.date !== ex.date)); const bf = +$('#wbf', el).value; S.weights.push(Object.assign({date: d, kg: r1(kg)}, bf > 2 && bf < 60 ? {bf: r1(bf)} : {})); dirty(null); closeSheet(); toast('Weight saved'); };
       const del = $('#del', el); if (del) del.onclick = () => { S.weights = S.weights.filter(w => w.date !== ex.date); dirty(null); closeSheet(); toast('Deleted'); };
     });
 }
@@ -1037,7 +1291,7 @@ async function flushSync(final) {
   const payload = {app: 'fuel', days: dates.map(d => ({date: d, rows: dayEntries(d).map(entryRow)}))};
   if (S.syncMeta) {
     payload.daily = dailyRows();
-    payload.weight = [...S.weights].sort((a, b) => a.date.localeCompare(b.date)).map(w => [w.date, w.kg, r1((trendOn(w.date) || w.kg) * 10) / 10]);
+    payload.weight = [...S.weights].sort((a, b) => a.date.localeCompare(b.date)).map(w => [w.date, w.kg, r1((trendOn(w.date) || w.kg) * 10) / 10, w.bf != null ? w.bf : '']);
     payload.targets = [...S.targets].sort((a, b) => a.start.localeCompare(b.start)).map(t => [t.start, t.kcal, t.p, t.f, t.c, t.source, t.note || '']);
     payload.foods = Object.values(S.foods).filter(f => f.source !== 'builtin').map(f => [f.id, f.name, f.brand || '', f.barcode || '', f.servings[0] ? f.servings[0].label : '', f.servings[0] ? f.servings[0].g : '', r0(f.per100.kcal), r1(f.per100.p), r1(f.per100.f), r1(f.per100.c)]);
     payload.settings = [['goal_rate_kg_per_week', S.goal.rate], ['auto_adjust', S.goal.auto], ['expenditure_estimate', S.tdee]];
@@ -1101,6 +1355,7 @@ function eraseAll() {
   // re-render each minute so the now line and suggestions move along
   setInterval(() => { if (!stack.length && view === 'log' && document.visibilityState === 'visible') { const y = window.scrollY; render(); window.scrollTo(0, y); } }, 60000);
   if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  setTimeout(foodWorker, 1500); // start downloading / loading the food database in the background
 })();
 </script>
 </body>
