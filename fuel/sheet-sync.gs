@@ -3,14 +3,14 @@
 // then Deploy > New deployment > Web app (Execute as: Me, Who has access: Anyone).
 // Open the app with  .../fuel/#sync=<the web app URL>  once to connect it.
 
-var SHEET_ID = '1EXggFFu-K0uL8xKfqaYBLNlOfWV6bKCRWDQOUcD_IZg'; // Fuel log
+var SHEET_ID = '1ZYCNVAW1ABN6MWTwnGWX-a_kE48JKSxtUJok_kgGaXg'; // Fuel log
 
 function doPost(e) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
     var data = JSON.parse(e.postData.contents);
-    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var ss = setup();
 
     // Entries: for each changed day, replace that day's rows.
     if (data.days && data.days.length) {
@@ -58,7 +58,7 @@ function replaceTab(sheet, rows) {
 // GET ?coach=1 returns the newest row of the Coach tab, which the app applies as targets.
 function doGet(e) {
   if (e && e.parameter && e.parameter.coach) {
-    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Coach');
+    var sh = setup().getSheetByName('Coach');
     var last = sh.getLastRow(), coach = null;
     if (last > 1) {
       var rows = sh.getRange(2, 1, last - 1, 6).getValues().filter(function (r) { return r[0] && r[1]; });
@@ -69,6 +69,28 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify({coach: coach})).setMimeType(ContentService.MimeType.JSON);
   }
   return ContentService.createTextOutput('Fuel sync is running.');
+}
+
+// Creates any missing tabs with their header rows. Safe to run any time.
+var TABS = {
+  Entries: ['date', 'time', 'food', 'brand', 'amount', 'grams', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'fibre_g', 'sugar_g', 'satfat_g', 'sodium_mg', 'food_id', 'entry_id'],
+  Daily: ['date', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'fibre_g', 'sodium_mg', 'target_kcal', 'target_p', 'target_f', 'target_c', 'scale_kg', 'trend_kg'],
+  Weight: ['date', 'scale_kg', 'trend_kg'],
+  Targets: ['start', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'source', 'note'],
+  Coach: ['start (YYYY-MM-DD)', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'note (add a row here to override targets; the newest row wins)'],
+  Foods: ['food_id', 'name', 'brand', 'barcode', 'serving', 'serving_g', 'kcal_100g', 'protein_100g', 'fat_100g', 'carbs_100g'],
+  Settings: ['setting', 'value']
+};
+function setup() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  Object.keys(TABS).forEach(function (name) {
+    if (ss.getSheetByName(name)) return;
+    var first = ss.getSheets()[0];
+    var sh = (ss.getSheets().length === 1 && first.getLastRow() === 0 && !TABS[first.getName()]) ? first.setName(name) : ss.insertSheet(name);
+    sh.getRange(1, 1, 1, TABS[name].length).setValues([TABS[name]]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+  });
+  return ss;
 }
 
 function normDate(v) {
