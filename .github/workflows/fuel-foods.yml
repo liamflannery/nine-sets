@@ -1,0 +1,35 @@
+name: Fuel food database
+# Rebuilds fuel/data/*.json (USDA generic foods + Australian Open Food Facts products) every Monday.
+on:
+  schedule:
+    - cron: '17 15 * * 0'   # Monday 2:17 am Sydney
+  workflow_dispatch:
+  push:
+    paths:
+      - 'fuel/tools/build_foods.py'
+      - '.github/workflows/fuel-foods.yml'
+permissions:
+  contents: write
+concurrency:
+  group: fuel-foods-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build
+        run: python fuel/tools/build_foods.py
+      - name: Commit if changed
+        run: |
+          git config user.name "fuel-data-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fuel/data
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Fuel: refresh food database"
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
