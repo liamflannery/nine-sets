@@ -288,6 +288,7 @@ const MICROS = [['fibre','Fibre','g',30],['sugar','Sugar','g',null],['satfat','S
 
 /* ================= state ================= */
 const KEY = 'fuel-v1';
+const SYNC_DEFAULT = 'https://script.google.com/macros/s/AKfycbxo8J-cEb-sdJU96jnmvidziUwRopC2PehslK9Ehs50gseZ41pUeDOwNOHp7m2kiVWR0w/exec'; // Fuel log Sheet
 const DEFAULT = () => ({
   v: 1,
   foods: {},
@@ -300,7 +301,7 @@ const DEFAULT = () => ({
   goal: {rate: -0.25, auto: true},
   lastCheckin: null,
   coach: null,
-  settings: {syncUrl: ''},
+  settings: {syncUrl: SYNC_DEFAULT},
   syncDates: [], syncMeta: false, lastSync: null
 });
 let S;
@@ -311,6 +312,7 @@ BUILTIN.forEach(b => {
     per100: {kcal: b[2], p: b[3], f: b[4], c: b[5], fibre: b[6], sugar: b[7], satfat: b[8], sodium: b[9]},
     servings: [{label: b[10][0], g: b[10][1]}]};
 });
+if (!S.settings.syncUrl && !S.settings.syncOff) { S.settings.syncUrl = SYNC_DEFAULT; S.syncMeta = true; S.syncDates = [...new Set(S.entries.map(e => e.date))]; }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { toast('Could not save on this device'); } }
 function dirty(date) { if (date && !S.syncDates.includes(date)) S.syncDates.push(date); S.syncMeta = true; save(); scheduleSync(); }
 

@@ -4,9 +4,9 @@ Private food and weight log. Lives at `/nine-sets/fuel/` on GitHub Pages, next t
 
 ## Connect the Google Sheet (one time)
 
-1. Open the "Fuel log" Google Sheet, then Extensions > Apps Script.
+1. Open the "Fuel log" Google Sheet (personal Gmail account), then Extensions > Apps Script. The script creates its tabs on first run.
 2. Paste in `sheet-sync.gs`, save, then Deploy > New deployment > Web app (Execute as: Me, Who has access: Anyone).
-3. Open `https://liamflannery.github.io/nine-sets/fuel/#sync=<web app URL>` on the phone once. The app shows "Google Sheet sync connected".
+3. The web app URL is built into `index.html` (SYNC_DEFAULT), so a fresh install syncs straight away. To point at a different script, change it in More > Google Sheet sync or open `.../fuel/#sync=<URL>`.
 
 ## Sheet tabs
 
