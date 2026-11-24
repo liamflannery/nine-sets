@@ -1352,6 +1352,21 @@ function dayDetail() {
 
 /* ---------- weight ---------- */
 /* ---------- weigh-in reminder (web push via the Apps Script) ---------- */
+let weighOpenedAt = 0;
+function openWeighIn() {
+  if (Date.now() - weighOpenedAt < 5000) return; weighOpenedAt = Date.now();
+  if (stack.length) closeSheet(true);
+  view = 'log'; selDate = todayStr(); render();
+  setTimeout(() => openWeight(), 150);
+}
+async function checkWeighFlag() {
+  try {
+    if (!('caches' in window)) return;
+    const c = await caches.open('fuel-flags'); const r = await c.match('weigh'); if (!r) return;
+    const t = +(await r.text()); await c.delete('weigh');
+    if (Date.now() - t < 10 * 60 * 1000) openWeighIn();
+  } catch (e) {}
+}
 function b64ToBytes(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
 async function postPush(body) {
   const url = S.settings.syncUrl; if (!url) throw new Error('nosync');
@@ -1534,8 +1549,11 @@ function eraseAll() {
   if (m) { try { S.settings.syncUrl = decodeURIComponent(m[1]); S.syncDates = [...new Set(S.entries.map(e => e.date))]; S.syncMeta = true; save(); history.replaceState(null, '', location.pathname); setTimeout(() => toast('Google Sheet sync connected'), 600); } catch (e) {} }
   runCheckin();
   render(); scrollToNow();
-  if (/[?&]weigh=1/.test(location.search)) { history.replaceState(null, '', location.pathname); setTimeout(() => openWeight(), 300); }
-  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data === 'weigh' && !stack.length) openWeight(); });
+  if (/[?&]weigh=1/.test(location.search)) { history.replaceState(null, '', location.pathname); openWeighIn(); }
+  checkWeighFlag();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkWeighFlag(); });
+  window.addEventListener('focus', checkWeighFlag);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data === 'weigh') openWeighIn(); });
   pullCoach(); flushSync();
   // re-render each minute so the now line and suggestions move along
   setInterval(() => { if (!stack.length && view === 'log' && document.visibilityState === 'visible') { const y = window.scrollY; render(); window.scrollTo(0, y); } }, 60000);
