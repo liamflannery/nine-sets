@@ -56,6 +56,14 @@ svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .lv span{display:block;font-size:12px;font-weight:600;color:var(--ink2);margin-top:1px}
 .bar{height:4px;border-radius:2px;background:var(--line);margin-top:8px;overflow:hidden}
 .bar i{display:block;height:100%}
+.stick{position:fixed;left:0;right:0;top:0;z-index:30;background:rgba(14,15,17,.94);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top) + 8px) 16px 10px;transform:translateY(-105%);transition:transform .18s ease;pointer-events:none}
+.stick.show{transform:none;pointer-events:auto}
+.stick .sd{font-size:13px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--ink2);margin-bottom:6px}
+.stick .sg{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;width:100%;text-align:left;padding:0;background:none}
+.stick .sv{font-size:14px;font-weight:700;white-space:nowrap}
+.stick .sv em{font-style:normal;font-weight:800;margin-right:4px}
+.stick .sv.over b{color:var(--bad)}
+.stick .bar{margin-top:5px;height:3px}
 .micro{display:flex;flex-wrap:wrap;gap:4px 14px;padding:10px 14px 0;font-size:13px;color:var(--ink2)}
 .micro b{color:var(--ink);font-weight:600}
 .coach{margin-top:10px;padding:10px 14px;border-radius:14px;background:var(--card);font-size:14px;color:var(--ink2);display:flex;gap:10px;align-items:flex-start}
@@ -396,6 +404,7 @@ function render() {
   else app.innerHTML = moreView();
   app.insertAdjacentHTML('beforeend', dockHtml());
   bindCommon();
+  syncStick();
 }
 
 function dockHtml() {
@@ -416,6 +425,20 @@ function weekStrip() {
   }
   return `<div class="week">${h}<button class="wk-arrow" data-week="7" aria-label="Next week">${svg('right')}</button></div>`;
 }
+
+function stickyBar(d) {
+  const t = targetFor(d); const s = sum(dayEntries(d));
+  const c = (val, tgt, lab, col, unit) => { const left = tgt - val, over = left < 0;
+    return `<div class="sv num${over ? ' over' : ''}"><em style="color:${col}">${lab}</em><b>${over ? '+' + fmt(-left) : fmt(left)}${unit}</b> ${over ? 'over' : 'left'}<div class="bar"><i style="width:${Math.min(100, val / tgt * 100)}%;background:${col}"></i></div></div>`; };
+  return `<div class="stick" id="stick" aria-hidden="true"><div class="sd">${dayName(d)}</div><button class="sg" data-act="daydetail" tabindex="-1">${c(s.kcal, t.kcal, '🔥', 'var(--acc)', '')}${c(s.p, t.p, 'P', 'var(--p)', 'g')}${c(s.f, t.f, 'F', 'var(--f)', 'g')}${c(s.c, t.c, 'C', 'var(--c)', 'g')}</button></div>`;
+}
+function syncStick() {
+  const st = document.getElementById('stick'), lp = document.querySelector('#app .left');
+  if (!st || !lp) return;
+  const show = lp.getBoundingClientRect().bottom < 0;
+  if (show !== st.classList.contains('show')) { st.classList.toggle('show', show); st.setAttribute('aria-hidden', show ? 'false' : 'true'); }
+}
+window.addEventListener('scroll', syncStick, {passive: true});
 
 function leftPanel(d) {
   const t = targetFor(d); const s = sum(dayEntries(d));
@@ -486,6 +509,7 @@ function logView() {
       <button class="ib" data-act="daymenu" aria-label="Day options">${svg('dots')}</button></div>
     ${weekStrip()}
     ${leftPanel(d)}
+    ${stickyBar(d)}
     ${coachNote}
     <div class="tl">${tl}</div>
     ${!list.length ? `<p class="empty">Nothing logged ${isToday ? 'yet today' : 'on this day'}. Tap + next to an hour, or search below.</p>` : ''}
