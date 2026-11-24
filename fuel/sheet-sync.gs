@@ -66,7 +66,13 @@ function doGet(e) {
       var r = rows[rows.length - 1];
       if (r) coach = {start: normDate(r[0]), kcal: +r[1], p: +r[2], f: +r[3], c: +r[4], note: String(r[5] || '')};
     }
-    return ContentService.createTextOutput(JSON.stringify({coach: coach})).setMimeType(ContentService.MimeType.JSON);
+    // Inbox: foods Claude logs for Liam. The app imports each row once (by id) when it opens.
+    var ib = setup().getSheetByName('Inbox'), inbox = [], il = ib.getLastRow();
+    if (il > 1) ib.getRange(2, 1, il - 1, 11).getValues().forEach(function (r) {
+      if (!r[0] || !r[1]) return;
+      inbox.push({id: String(r[0]), date: normDate(r[1]), time: normTime(r[2]), name: String(r[3]), kcal: r[4], p: r[5], f: r[6], c: r[7], fibre: r[8], sodium: r[9], label: String(r[10] || '')});
+    });
+    return ContentService.createTextOutput(JSON.stringify({coach: coach, inbox: inbox.slice(-200)})).setMimeType(ContentService.MimeType.JSON);
   }
   return ContentService.createTextOutput('Fuel sync is running.');
 }
@@ -77,6 +83,7 @@ var TABS = {
   Daily: ['date', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'fibre_g', 'sodium_mg', 'target_kcal', 'target_p', 'target_f', 'target_c', 'scale_kg', 'trend_kg'],
   Weight: ['date', 'scale_kg', 'trend_kg'],
   Targets: ['start', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'source', 'note'],
+  Inbox: ['id (any unique text)', 'date (YYYY-MM-DD)', 'time (HH:MM)', 'food', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'fibre_g', 'sodium_mg', 'amount label'],
   Coach: ['start (YYYY-MM-DD)', 'kcal', 'protein_g', 'fat_g', 'carbs_g', 'note (add a row here to override targets; the newest row wins)'],
   Foods: ['food_id', 'name', 'brand', 'barcode', 'serving', 'serving_g', 'kcal_100g', 'protein_100g', 'fat_100g', 'carbs_100g'],
   Settings: ['setting', 'value']

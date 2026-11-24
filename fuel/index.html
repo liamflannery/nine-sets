@@ -1305,7 +1305,9 @@ async function pullCoach() {
   const url = S.settings.syncUrl; if (!url || !navigator.onLine) return;
   try {
     const r = await fetch(url + (url.includes('?') ? '&' : '?') + 'coach=1'); if (!r.ok) return;
-    const j = await r.json(); const c = j && j.coach; if (!c || !c.start || !c.kcal) return;
+    const j = await r.json(); if (!j) return;
+    importInbox(j.inbox);
+    const c = j.coach; if (!c || !c.start || !c.kcal) return;
     const key = c.start + '|' + c.kcal + '|' + c.p + '|' + c.f + '|' + c.c;
     if (S.coach && S.coach.key === key) return;
     S.coach = {key, start: c.start};
@@ -1313,6 +1315,28 @@ async function pullCoach() {
     S.targets.push({start: c.start, kcal: +c.kcal, p: +c.p, f: +c.f, c: +c.c, source: 'coach', note: c.note || ''});
     dirty(null); render(); toast('New targets from Claude');
   } catch (e) {}
+}
+// Rows Claude adds to the Sheet's Inbox tab become entries here (each row once, matched by its id).
+function importInbox(rows) {
+  if (!Array.isArray(rows) || !rows.length) return;
+  S.inboxDone = S.inboxDone || [];
+  const added = [];
+  rows.forEach(x => {
+    const id = 'in-' + String(x.id || '').trim();
+    if (id === 'in-' || S.inboxDone.includes(id) || S.entries.some(e => e.id === id)) return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(x.date) || !(+x.kcal >= 0)) return;
+    const time = /^\d{1,2}:\d{2}/.test(x.time) ? x.time.padStart(5, '0').slice(0, 5) : '12:00';
+    const name = String(x.name || 'Added by Claude').slice(0, 80);
+    const rec = {id, date: x.date, time, foodId: null, name, brand: '', emoji: x.emoji || emojiFor(name), amount: 1, unit: '', label: String(x.label || ''), grams: 0,
+      kcal: +x.kcal, p: +x.p || 0, f: +x.f || 0, c: +x.c || 0};
+    if (x.fibre !== '' && x.fibre != null) rec.fibre = +x.fibre;
+    if (x.sodium !== '' && x.sodium != null) rec.sodium = +x.sodium;
+    S.entries.push(rec); S.inboxDone.push(id); added.push(rec);
+  });
+  if (!added.length) return;
+  [...new Set(added.map(e => e.date))].forEach(d => dirty(d));
+  if (!stack.length) render();
+  toast(added.length === 1 ? `Claude logged ${added[0].name}` : `Claude logged ${added.length} foods`);
 }
 function syncSettings() {
   sheet('Google Sheet sync', `<p class="note" style="margin-top:0">Every entry, weigh-in and target change is sent to your Fuel Google Sheet, so Claude can read it for check-ins. Claude can also set targets in the Sheet's Coach tab, which the app picks up when it opens.</p>
