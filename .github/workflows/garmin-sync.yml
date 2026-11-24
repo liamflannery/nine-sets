@@ -1,0 +1,58 @@
+name: Garmin sync
+# Pulls runs from Garmin Connect into the "Garmin log" Sheet and pushes the Sheet's
+# Plan tab to the Garmin Connect calendar (and so to the watch). See garmin/README.md.
+on:
+  schedule:
+    - cron: '23 */2 * * *'   # every 2 hours
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: 'Days of runs to sync (use 120 once to backfill)'
+        required: false
+        default: '14'
+      dry_run:
+        description: 'Dry run: print only, change nothing'
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: garmin-sync
+  cancel-in-progress: false
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: garmin/requirements.txt
+      - run: pip install -r garmin/requirements.txt
+      # The Garmin session is kept between runs so we don't log in with the password every time.
+      # It is encrypted with a key derived from GARMIN_PASSWORD, since caches are not secret.
+      - name: Restore Garmin session
+        uses: actions/cache/restore@v4
+        with:
+          path: .garmin
+          key: garmin-session-${{ github.run_id }}
+          restore-keys: garmin-session-
+      - name: Sync
+        working-directory: garmin
+        env:
+          GARMIN_EMAIL: ${{ secrets.GARMIN_EMAIL }}
+          GARMIN_PASSWORD: ${{ secrets.GARMIN_PASSWORD }}
+          GARMIN_TOKENS: ${{ secrets.GARMIN_TOKENS }}
+          GARMIN_SHEET_URL: ${{ secrets.GARMIN_SHEET_URL }}
+          TOKEN_FILE: ${{ github.workspace }}/.garmin/tokens.enc
+          LOOKBACK_DAYS: ${{ inputs.lookback_days || '14' }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '0' }}
+        run: python garmin_sync.py
+      - name: Save Garmin session
+        if: always() && hashFiles('.garmin/tokens.enc') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .garmin
+          key: garmin-session-${{ github.run_id }}
