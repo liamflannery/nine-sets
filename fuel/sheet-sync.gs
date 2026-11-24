@@ -10,6 +10,7 @@ function doPost(e) {
   lock.waitLock(20000);
   try {
     var data = JSON.parse(e.postData.contents);
+    if (data.push) { handlePush(data.push); return ContentService.createTextOutput('{"ok":true}').setMimeType(ContentService.MimeType.JSON); }
     var ss = setup();
 
     // Entries: for each changed day, replace that day's rows.
@@ -57,6 +58,10 @@ function replaceTab(sheet, rows) {
 
 // GET ?coach=1 returns the newest row of the Coach tab, which the app applies as targets.
 function doGet(e) {
+  if (e && e.parameter && e.parameter.vapid) {
+    var st = remindState();
+    return ContentService.createTextOutput(JSON.stringify({key: vapidKeys().pub, on: st.on, time: st.time, subs: st.subs.length})).setMimeType(ContentService.MimeType.JSON);
+  }
   if (e && e.parameter && e.parameter.coach) {
     var sh = setup().getSheetByName('Coach');
     var last = sh.getLastRow(), coach = null;
@@ -108,3 +113,100 @@ function normTime(v) {
   if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
   return String(v);
 }
+
+// ================= Weigh-in reminder (Web Push) =================
+// The app subscribes to push and posts {push: {...}} here. remindTick runs every 5 minutes
+// (created by setupReminders) and sends a payload-free push at the chosen time. The service
+// worker shows "Time to weigh in". VAPID keys are made here and the private key never leaves
+// this script's properties.
+var PUSH_SUBJECT = 'https://liamflannery.github.io/nine-sets/fuel/';
+
+// ---- Minimal P-256 ECDSA for VAPID (pure JS, BigInt) ----
+var EC_P = BigInt('0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff');
+var EC_N = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
+var EC_A = EC_P - 3n;
+var EC_G = [BigInt('0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296'), BigInt('0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5')];
+function ecMod(a, m) { var r = a % m; return r < 0n ? r + m : r; }
+function ecInv(a, m) { var lm = 1n, hm = 0n, low = ecMod(a, m), high = m; while (low > 1n) { var q = high / low; var nm = hm - lm * q, nw = high - low * q; hm = lm; high = low; lm = nm; low = nw; } return ecMod(lm, m); }
+// Jacobian coordinates
+function ecDbl(P) { if (!P || P[1] === 0n) return null; var X = P[0], Y = P[1], Z = P[2], p = EC_P;
+  var YY = Y * Y % p, S = 4n * X % p * YY % p, ZZ = Z * Z % p, M = (3n * X % p * X % p + EC_A * ZZ % p * ZZ) % p;
+  var X3 = ecMod(M * M - 2n * S, p), Y3 = ecMod(M * (S - X3) - 8n * YY % p * YY, p), Z3 = 2n * Y % p * Z % p; return [X3, Y3, Z3]; }
+function ecAdd(P, Q) { if (!P) return Q; if (!Q) return P; var p = EC_P;
+  var Z1Z1 = P[2] * P[2] % p, Z2Z2 = Q[2] * Q[2] % p, U1 = P[0] * Z2Z2 % p, U2 = Q[0] * Z1Z1 % p, S1 = P[1] * Q[2] % p * Z2Z2 % p, S2 = Q[1] * P[2] % p * Z1Z1 % p;
+  if (U1 === U2) return S1 === S2 ? ecDbl(P) : null;
+  var H = ecMod(U2 - U1, p), R = ecMod(S2 - S1, p), HH = H * H % p, HHH = H * HH % p, V = U1 * HH % p;
+  var X3 = ecMod(R * R - HHH - 2n * V, p), Y3 = ecMod(R * (V - X3) - S1 * HHH, p), Z3 = P[2] * Q[2] % p * H % p; return [X3, Y3, Z3]; }
+function ecMul(k, G) { var R = null, A = [G[0], G[1], 1n]; while (k > 0n) { if (k & 1n) R = ecAdd(R, A); A = ecDbl(A); k >>= 1n; } if (!R) return null; var zi = ecInv(R[2], EC_P), zi2 = zi * zi % EC_P; return [R[0] * zi2 % EC_P, R[1] * zi2 % EC_P * zi % EC_P]; }
+function bytesToBig(b) { var h = '0x'; for (var i = 0; i < b.length; i++) h += ((b[i] + 256) % 256).toString(16).padStart(2, '0'); return BigInt(h); }
+function bigToBytes(x, len) { var h = x.toString(16).padStart(len * 2, '0'), out = []; for (var i = 0; i < len; i++) { var v = parseInt(h.substr(i * 2, 2), 16); out.push(v > 127 ? v - 256 : v); } return out; }
+function b64url(bytes) { return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, ''); }
+function sha256(bytes) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, bytes); }
+function vapidKeys() {
+  var props = PropertiesService.getScriptProperties();
+  var d = props.getProperty('VAPID_D');
+  if (!d) {
+    var seed = Utilities.newBlob(Utilities.getUuid() + Utilities.getUuid() + Date.now() + Math.random()).getBytes();
+    var dn = ecMod(bytesToBig(sha256(seed)), EC_N - 1n) + 1n;
+    var Q = ecMul(dn, EC_G);
+    props.setProperties({VAPID_D: dn.toString(16), VAPID_PUB: b64url([4].concat(bigToBytes(Q[0], 32), bigToBytes(Q[1], 32)))});
+    d = props.getProperty('VAPID_D');
+  }
+  return {d: BigInt('0x' + d), pub: props.getProperty('VAPID_PUB')};
+}
+function es256(input, d) {
+  var msg = Utilities.newBlob(input).getBytes();
+  var hb = sha256(msg), e = bytesToBig(hb);
+  for (var i = 0; i < 64; i++) {
+    var k = ecMod(bytesToBig(sha256(bigToBytes(d, 32).concat(hb, [i]))), EC_N);
+    if (k === 0n) continue;
+    var R = ecMul(k, EC_G), r = ecMod(R[0], EC_N); if (r === 0n) continue;
+    var s = ecMod(ecInv(k, EC_N) * ecMod(e + r * d, EC_N), EC_N); if (s === 0n) continue;
+    return bigToBytes(r, 32).concat(bigToBytes(s, 32));
+  }
+  throw new Error('could not sign');
+}
+function vapidHeader(endpoint) {
+  var keys = vapidKeys(), m = endpoint.match(/^https:\/\/[^\/]+/);
+  var enc = function (o) { return b64url(Utilities.newBlob(JSON.stringify(o)).getBytes()); };
+  var input = enc({typ: 'JWT', alg: 'ES256'}) + '.' + enc({aud: m[0], exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: PUSH_SUBJECT});
+  return 'vapid t=' + input + '.' + b64url(es256(input, keys.d)) + ', k=' + keys.pub;
+}
+function sendPush(sub) {
+  var res = UrlFetchApp.fetch(sub.endpoint, {method: 'post', headers: {Authorization: vapidHeader(sub.endpoint), TTL: '14400', Urgency: 'high'}, payload: '', muteHttpExceptions: true});
+  return res.getResponseCode();
+}
+function remindState() { return JSON.parse(PropertiesService.getScriptProperties().getProperty('REMIND') || '{"on":false,"time":"07:00","tz":"Australia/Sydney","subs":[],"last":""}'); }
+function saveRemind(st) { PropertiesService.getScriptProperties().setProperty('REMIND', JSON.stringify(st)); }
+function handlePush(p) {
+  var st = remindState();
+  if (p.time && /^\d\d:\d\d$/.test(p.time)) st.time = p.time;
+  if (p.tz) st.tz = String(p.tz);
+  if (p.on != null) st.on = !!p.on;
+  if (p.sub && p.sub.endpoint && /^https:\/\//.test(p.sub.endpoint)) {
+    st.subs = st.subs.filter(function (s) { return s.endpoint !== p.sub.endpoint; });
+    st.subs.push({endpoint: p.sub.endpoint});
+    st.subs = st.subs.slice(-5);
+  }
+  if (p.sub && p.time && st.time !== st.lastTime) { st.last = ''; st.lastTime = st.time; }
+  saveRemind(st);
+  if (p.test) st.subs.forEach(function (s) { try { sendPush(s); } catch (e) {} });
+  try { ensureTrigger(); } catch (e) {}
+}
+function ensureTrigger() {
+  var has = ScriptApp.getProjectTriggers().some(function (t) { return t.getHandlerFunction() === 'remindTick'; });
+  if (!has) ScriptApp.newTrigger('remindTick').timeBased().everyMinutes(5).create();
+}
+function remindTick() {
+  var st = remindState(); if (!st.on || !st.subs.length) return;
+  var now = new Date(), day = Utilities.formatDate(now, st.tz, 'yyyy-MM-dd'), hm = Utilities.formatDate(now, st.tz, 'HH:mm');
+  if (st.last === day) return;
+  var toM = function (t) { return +t.slice(0, 2) * 60 + +t.slice(3, 5); };
+  var late = toM(hm) - toM(st.time);
+  if (late < 0 || late > 180) return;
+  var keep = [];
+  st.subs.forEach(function (s) { var code = 0; try { code = sendPush(s); } catch (e) {} if (code !== 404 && code !== 410) keep.push(s); });
+  st.subs = keep; st.last = day; saveRemind(st);
+}
+// Run this once from the editor to approve the permissions and start the 5-minute check.
+function setupReminders() { vapidKeys(); ensureTrigger(); Logger.log('Public key: ' + vapidKeys().pub); }

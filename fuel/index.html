@@ -561,7 +561,8 @@ function logView() {
   const sugByHour = {};
   if (isToday) {
     const used = new Set();
-    for (let h = Math.floor(nowM / 60); h <= Math.min(23, Math.floor(nowM / 60) + 5); h++) {
+    for (let h = Math.max(0, Math.floor(nowM / 60) - 2); h <= Math.min(23, Math.floor(nowM / 60) + 5); h++) {
+      if (h < Math.floor(nowM / 60) && hours.has(h)) continue;
       const sg = suggestions(d, h * 60 + 30, 3, 45).filter(s => s.count >= 2 && !used.has(s.key));
       if (sg[0]) { sugByHour[h] = sg[0]; used.add(sg[0].key); }
     }
@@ -714,6 +715,7 @@ function moreView() {
   return `<div class="scroll"><div class="top"><h1>More</h1></div><div class="list">
     ${item('foods', 'meal', 'My foods and meals', 'Custom foods, saved meals, favourites')}
     ${item('newfood', 'plus', 'Create a food', 'Enter it from a label')}
+    ${item('remind', 'scale', 'Weigh-in reminder', S.remind && S.remind.on ? 'Daily at ' + timeLabel(S.remind.time) : 'Off')}
     ${item('syncset', 'sync', 'Google Sheet sync', st.syncUrl ? 'On' + (S.lastSync ? ', last sent ' + new Date(S.lastSync).toLocaleString('en-AU') : '') : 'Off')}
     ${item('export', 'save', 'Back up data', 'Save a file you can restore later')}
     ${item('import', 'upload', 'Restore backup')}
@@ -754,6 +756,7 @@ function bindCommon() {
     if (a === 'foods') return openLibrary();
     if (a === 'newfood') return editFood(null);
     if (a === 'syncset') return syncSettings();
+    if (a === 'remind') return remindSheet();
     if (a === 'export') return exportData();
     if (a === 'import') return importData();
     if (a === 'erase') return eraseAll();
@@ -1094,6 +1097,7 @@ function openFood(f, ctx, entry) {
   const srcNote = {off: 'Values from Open Food Facts, per 100 g scaled to your amount. Check the label if something looks off.', usda: 'Generic values from USDA FoodData Central.', builtin: 'Approximate values from the built-in list.'}[f.source] || '';
   sheet(entry ? 'Edit entry' : 'Food', `
     <div class="fhead"><span class="ic big">${esc(f.emoji)}</span><div><div class="nm" style="font-size:19px">${esc(f.name)}</div>${f.brand || f.barcode ? `<div class="note">${esc([f.brand, f.barcode].filter(Boolean).join(' · '))}</div>` : ''}</div></div>
+    ${!entry && lastUse(f.id) ? `<p class="note" style="margin:-4px 0 10px">Using your usual amount: ${esc(lastUse(f.id).label || '')} (last logged ${esc(dayName(lastUse(f.id).date).replace(/^(Today|Yesterday|Tomorrow)$/, x => x.toLowerCase()))}).</p>` : ''}
     ${(f.warn || []).map(w => `<div class="warnbox">⚠ ${esc(w)}</div>`).join('')}
     ${f.incomplete ? '<div class="warnbox">This product has no calorie data on Open Food Facts. Edit it to add the label values.</div>' : ''}
     <div id="nb"></div>
@@ -1203,7 +1207,8 @@ function openQuick(ctx, entry) {
         const rec = {id: entry ? entry.id : uid(), date, time: $('#qt', el).value || ctx.time, foodId: null, name, emoji: '⚡', amount: 1, unit: '', label: '', grams: 0, kcal: k, p, f, c};
         if (entry) { S.entries = S.entries.map(x => x.id === entry.id ? rec : x); dirty(entry.date); }
         else S.entries.push(rec);
-        dirty(date); closeSheet(true); toast(entry ? 'Saved' : 'Logged ' + name);
+        dirty(date); closeSheet(true);
+        if (entry) toast('Saved'); else toast('Logged ' + name, () => { S.entries = S.entries.filter(x => x.id !== rec.id); dirty(date); render(); });
       };
       const d = $('#del', el); if (d) d.onclick = () => deleteEntry(entry);
     });
@@ -1346,6 +1351,54 @@ function dayDetail() {
 }
 
 /* ---------- weight ---------- */
+/* ---------- weigh-in reminder (web push via the Apps Script) ---------- */
+function b64ToBytes(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; return Uint8Array.from(atob(s), c => c.charCodeAt(0)); }
+async function postPush(body) {
+  const url = S.settings.syncUrl; if (!url) throw new Error('nosync');
+  await fetch(url, {method: 'POST', mode: 'no-cors', headers: {'Content-Type': 'text/plain;charset=utf-8'}, body: JSON.stringify({push: body})});
+}
+async function pushSubscribe() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) throw new Error('unsupported');
+  const perm = await Notification.requestPermission();
+  if (perm !== 'granted') throw new Error('denied');
+  const reg = await navigator.serviceWorker.ready;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) {
+    const url = S.settings.syncUrl; if (!url) throw new Error('nosync');
+    const j = await (await fetch(url + (url.includes('?') ? '&' : '?') + 'vapid=1')).json();
+    sub = await reg.pushManager.subscribe({userVisibleOnly: true, applicationServerKey: b64ToBytes(j.key)});
+  }
+  return sub.toJSON();
+}
+function remindSheet() {
+  const r = S.remind || {on: false, time: '07:00'};
+  const standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const ios = /iP(hone|ad|od)/.test(navigator.userAgent);
+  sheet('Weigh-in reminder', `
+    <div class="card"><label class="menu-item" style="padding:0;background:none"><span>Remind me every day<small>A notification to log your morning weight</small></span><input type="checkbox" id="ron" ${r.on ? 'checked' : ''} style="width:auto;flex:none;transform:scale(1.4)"></label></div>
+    <div class="field" style="margin-top:12px"><label for="rtime">Time</label><input id="rtime" type="time" value="${r.time}"></div>
+    ${ios && !standalone ? '<div class="warnbox">On iPhone, notifications only work when Fuel is opened from your Home Screen. In Safari tap Share, then Add to Home Screen, and open Fuel from there.</div>' : ''}
+    <p class="note">It can arrive up to 5 minutes after the time you pick. Tapping it opens the weight entry.</p>`,
+    `<button class="btn sec" id="rtest" style="flex:none;padding:0 16px">Send a test</button><button class="btn" id="go">Save</button>`, el => {
+      const run = async test => {
+        const on = $('#ron', el).checked, time = $('#rtime', el).value || '07:00';
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Australia/Sydney';
+        try {
+          const body = {on, time, tz, test: !!test};
+          if (on || test) body.sub = await pushSubscribe();
+          await postPush(body);
+          S.remind = {on, time}; save();
+          if (test) toast('Test sent. It should arrive within a few seconds'); else { closeSheet(true); toast(on ? 'Reminder set for ' + timeLabel(time) : 'Reminder off'); }
+        } catch (e) {
+          const m = {unsupported: ios ? 'Open Fuel from your Home Screen to turn on notifications' : 'This browser cannot show notifications', denied: 'Notifications are blocked. Allow them for Fuel in Settings', nosync: 'Turn on Google Sheet sync first'}[e.message];
+          toast(m || 'Could not set the reminder. Check your connection');
+        }
+      };
+      $('#go', el).onclick = () => run(false);
+      $('#rtest', el).onclick = () => run(true);
+    });
+}
+
 function openWeight(date) {
   const ex = date ? S.weights.find(w => w.date === date) : S.weights.find(w => w.date === todayStr());
   const last = [...S.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
@@ -1481,6 +1534,8 @@ function eraseAll() {
   if (m) { try { S.settings.syncUrl = decodeURIComponent(m[1]); S.syncDates = [...new Set(S.entries.map(e => e.date))]; S.syncMeta = true; save(); history.replaceState(null, '', location.pathname); setTimeout(() => toast('Google Sheet sync connected'), 600); } catch (e) {} }
   runCheckin();
   render(); scrollToNow();
+  if (/[?&]weigh=1/.test(location.search)) { history.replaceState(null, '', location.pathname); setTimeout(() => openWeight(), 300); }
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data === 'weigh' && !stack.length) openWeight(); });
   pullCoach(); flushSync();
   // re-render each minute so the now line and suggestions move along
   setInterval(() => { if (!stack.length && view === 'log' && document.visibilityState === 'visible') { const y = window.scrollY; render(); window.scrollTo(0, y); } }, 60000);
