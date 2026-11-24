@@ -1,4 +1,4 @@
-const CACHE = 'fuel-v4';
+const CACHE = 'fuel-v5';
 const FILES = ['./', 'index.html', 'search.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 const SCANNER = 'https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js';
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
@@ -23,4 +23,19 @@ self.addEventListener('fetch', e => {
     return;
   }
   e.respondWith(caches.match(req).then(r => r || fetch(req)));
+});
+
+// Weigh-in reminder: the Apps Script sends a push with no payload at the chosen time.
+self.addEventListener('push', e => {
+  let msg = {title: 'Time to weigh in', body: 'Step on the scale and log your morning weight.'};
+  try { if (e.data) msg = Object.assign(msg, e.data.json()); } catch (err) {}
+  e.waitUntil(self.registration.showNotification(msg.title, {body: msg.body, tag: 'weigh-in', icon: 'icon-192.png', badge: 'icon-192.png', data: {url: './?weigh=1'}}));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(self.clients.matchAll({type: 'window', includeUncontrolled: true}).then(cs => {
+    const c = cs.find(x => x.url.includes('/fuel/'));
+    if (c) { c.postMessage('weigh'); return c.focus(); }
+    return self.clients.openWindow(e.notification.data && e.notification.data.url || './?weigh=1');
+  }));
 });
