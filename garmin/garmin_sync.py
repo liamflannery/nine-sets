@@ -262,9 +262,13 @@ def sheet_post(url: str, payload: dict) -> None:
 
 
 def main() -> int:
-    url = os.getenv("GARMIN_SHEET_URL")
+    url = (os.getenv("GARMIN_SHEET_URL") or "").strip()
     if not url:
         raise SystemExit("GARMIN_SHEET_URL is not set.")
+    if "/exec" in url:
+        url = url.split("/exec")[0] + "/exec"  # drop anything pasted after /exec
+    if not url.startswith("https://script.google.com/macros/"):
+        log("GARMIN_SHEET_URL doesn't look like an Apps Script web app link (https://script.google.com/macros/s/.../exec).")
     today = datetime.now(TZ).date()
     lookback = int(os.getenv("LOOKBACK_DAYS") or 14)
     plan = sheet_get(url)
