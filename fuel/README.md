@@ -13,6 +13,7 @@ Private food and weight log. Lives at `/nine-sets/fuel/` on GitHub Pages, next t
 - **Entries**: one row per logged food (date, time, food, amount, kcal, macros, fibre, sugar, sat fat, sodium).
 - **Daily**: totals per day with that day's targets and scale/trend weight.
 - **Weight**, **Targets**, **Foods**, **Settings**: full copies sent by the app.
+- **Inbox**: Claude adds a row (id, date, time, food, kcal, protein, fat, carbs, fibre, sodium, amount) to log a food for you. The app imports each row once when it opens.
 - **Coach**: add a row (start date, kcal, protein, fat, carbs, note) to override targets. The app picks up the newest row when it opens.
 
 ## Food database
