@@ -122,22 +122,24 @@ function normTime(v) {
 var PUSH_SUBJECT = 'https://liamflannery.github.io/nine-sets/fuel/';
 
 // ---- Minimal P-256 ECDSA for VAPID (pure JS, BigInt) ----
+// Apps Script cannot parse BigInt literals (3n), so the small constants are made once here.
+var B0 = BigInt(0), B1 = BigInt(1), B2 = BigInt(2), B3 = BigInt(3), B4 = BigInt(4), B8 = BigInt(8);
 var EC_P = BigInt('0xffffffff00000001000000000000000000000000ffffffffffffffffffffffff');
 var EC_N = BigInt('0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551');
-var EC_A = EC_P - 3n;
+var EC_A = EC_P - B3;
 var EC_G = [BigInt('0x6b17d1f2e12c4247f8bce6e563a440f277037d812deb33a0f4a13945d898c296'), BigInt('0x4fe342e2fe1a7f9b8ee7eb4a7c0f9e162bce33576b315ececbb6406837bf51f5')];
-function ecMod(a, m) { var r = a % m; return r < 0n ? r + m : r; }
-function ecInv(a, m) { var lm = 1n, hm = 0n, low = ecMod(a, m), high = m; while (low > 1n) { var q = high / low; var nm = hm - lm * q, nw = high - low * q; hm = lm; high = low; lm = nm; low = nw; } return ecMod(lm, m); }
+function ecMod(a, m) { var r = a % m; return r < B0 ? r + m : r; }
+function ecInv(a, m) { var lm = B1, hm = B0, low = ecMod(a, m), high = m; while (low > B1) { var q = high / low; var nm = hm - lm * q, nw = high - low * q; hm = lm; high = low; lm = nm; low = nw; } return ecMod(lm, m); }
 // Jacobian coordinates
-function ecDbl(P) { if (!P || P[1] === 0n) return null; var X = P[0], Y = P[1], Z = P[2], p = EC_P;
-  var YY = Y * Y % p, S = 4n * X % p * YY % p, ZZ = Z * Z % p, M = (3n * X % p * X % p + EC_A * ZZ % p * ZZ) % p;
-  var X3 = ecMod(M * M - 2n * S, p), Y3 = ecMod(M * (S - X3) - 8n * YY % p * YY, p), Z3 = 2n * Y % p * Z % p; return [X3, Y3, Z3]; }
+function ecDbl(P) { if (!P || P[1] === B0) return null; var X = P[0], Y = P[1], Z = P[2], p = EC_P;
+  var YY = Y * Y % p, S = B4 * X % p * YY % p, ZZ = Z * Z % p, M = (B3 * X % p * X % p + EC_A * ZZ % p * ZZ) % p;
+  var X3 = ecMod(M * M - B2 * S, p), Y3 = ecMod(M * (S - X3) - B8 * YY % p * YY, p), Z3 = B2 * Y % p * Z % p; return [X3, Y3, Z3]; }
 function ecAdd(P, Q) { if (!P) return Q; if (!Q) return P; var p = EC_P;
   var Z1Z1 = P[2] * P[2] % p, Z2Z2 = Q[2] * Q[2] % p, U1 = P[0] * Z2Z2 % p, U2 = Q[0] * Z1Z1 % p, S1 = P[1] * Q[2] % p * Z2Z2 % p, S2 = Q[1] * P[2] % p * Z1Z1 % p;
   if (U1 === U2) return S1 === S2 ? ecDbl(P) : null;
   var H = ecMod(U2 - U1, p), R = ecMod(S2 - S1, p), HH = H * H % p, HHH = H * HH % p, V = U1 * HH % p;
-  var X3 = ecMod(R * R - HHH - 2n * V, p), Y3 = ecMod(R * (V - X3) - S1 * HHH, p), Z3 = P[2] * Q[2] % p * H % p; return [X3, Y3, Z3]; }
-function ecMul(k, G) { var R = null, A = [G[0], G[1], 1n]; while (k > 0n) { if (k & 1n) R = ecAdd(R, A); A = ecDbl(A); k >>= 1n; } if (!R) return null; var zi = ecInv(R[2], EC_P), zi2 = zi * zi % EC_P; return [R[0] * zi2 % EC_P, R[1] * zi2 % EC_P * zi % EC_P]; }
+  var X3 = ecMod(R * R - HHH - B2 * V, p), Y3 = ecMod(R * (V - X3) - S1 * HHH, p), Z3 = P[2] * Q[2] % p * H % p; return [X3, Y3, Z3]; }
+function ecMul(k, G) { var R = null, A = [G[0], G[1], B1]; while (k > B0) { if (k & B1) R = ecAdd(R, A); A = ecDbl(A); k >>= B1; } if (!R) return null; var zi = ecInv(R[2], EC_P), zi2 = zi * zi % EC_P; return [R[0] * zi2 % EC_P, R[1] * zi2 % EC_P * zi % EC_P]; }
 function bytesToBig(b) { var h = '0x'; for (var i = 0; i < b.length; i++) h += ((b[i] + 256) % 256).toString(16).padStart(2, '0'); return BigInt(h); }
 function bigToBytes(x, len) { var h = x.toString(16).padStart(len * 2, '0'), out = []; for (var i = 0; i < len; i++) { var v = parseInt(h.substr(i * 2, 2), 16); out.push(v > 127 ? v - 256 : v); } return out; }
 function b64url(bytes) { return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, ''); }
@@ -147,7 +149,7 @@ function vapidKeys() {
   var d = props.getProperty('VAPID_D');
   if (!d) {
     var seed = Utilities.newBlob(Utilities.getUuid() + Utilities.getUuid() + Date.now() + Math.random()).getBytes();
-    var dn = ecMod(bytesToBig(sha256(seed)), EC_N - 1n) + 1n;
+    var dn = ecMod(bytesToBig(sha256(seed)), EC_N - B1) + B1;
     var Q = ecMul(dn, EC_G);
     props.setProperties({VAPID_D: dn.toString(16), VAPID_PUB: b64url([4].concat(bigToBytes(Q[0], 32), bigToBytes(Q[1], 32)))});
     d = props.getProperty('VAPID_D');
@@ -159,9 +161,9 @@ function es256(input, d) {
   var hb = sha256(msg), e = bytesToBig(hb);
   for (var i = 0; i < 64; i++) {
     var k = ecMod(bytesToBig(sha256(bigToBytes(d, 32).concat(hb, [i]))), EC_N);
-    if (k === 0n) continue;
-    var R = ecMul(k, EC_G), r = ecMod(R[0], EC_N); if (r === 0n) continue;
-    var s = ecMod(ecInv(k, EC_N) * ecMod(e + r * d, EC_N), EC_N); if (s === 0n) continue;
+    if (k === B0) continue;
+    var R = ecMul(k, EC_G), r = ecMod(R[0], EC_N); if (r === B0) continue;
+    var s = ecMod(ecInv(k, EC_N) * ecMod(e + r * d, EC_N), EC_N); if (s === B0) continue;
     return bigToBytes(r, 32).concat(bigToBytes(s, 32));
   }
   throw new Error('could not sign');
