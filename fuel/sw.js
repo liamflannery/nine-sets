@@ -1,4 +1,4 @@
-const CACHE = 'fuel-v6';
+const CACHE = 'fuel-v7';
 const FILES = ['./', 'index.html', 'search.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 const SCANNER = 'https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js';
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
