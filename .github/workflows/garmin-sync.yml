@@ -1,9 +1,8 @@
 name: Garmin sync
 # Pulls runs from Garmin Connect into the "Garmin log" Sheet and pushes the Sheet's
 # Plan tab to the Garmin Connect calendar (and so to the watch). See garmin/README.md.
+# Manual only: Claude runs it at each check-in (Actions > Garmin sync > Run workflow).
 on:
-  schedule:
-    - cron: '23 */2 * * *'   # every 2 hours
   workflow_dispatch:
     inputs:
       lookback_days:

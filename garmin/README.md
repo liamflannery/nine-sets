@@ -1,6 +1,7 @@
 # Garmin sync
 
-Every 2 hours a GitHub Action (`.github/workflows/garmin-sync.yml`) logs in to Garmin Connect and:
+A GitHub Action (`.github/workflows/garmin-sync.yml`) logs in to Garmin Connect and does the two things below.
+It runs only when started by hand: Claude starts it at each check-in, or use **Actions → Garmin sync → Run workflow**.
 
 1. **Runs → Sheet.** Copies the last 14 days of runs into the "Garmin log" Google Sheet:
    the **Runs** tab (distance, time, pace, HR, minutes in each HR zone, training effect, load,
