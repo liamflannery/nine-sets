@@ -1,4 +1,4 @@
-const CACHE = 'fuel-v5';
+const CACHE = 'fuel-v6';
 const FILES = ['./', 'index.html', 'search.js', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 const SCANNER = 'https://unpkg.com/@zxing/library@0.20.0/umd/index.min.js';
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())); });
@@ -33,9 +33,11 @@ self.addEventListener('push', e => {
 });
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  e.waitUntil(self.clients.matchAll({type: 'window', includeUncontrolled: true}).then(cs => {
+  // Leave a flag the page checks whenever it opens or comes to the front. iOS often reloads the
+  // app or ignores the URL, so the message alone is not enough.
+  e.waitUntil(caches.open('fuel-flags').then(c => c.put('weigh', new Response(String(Date.now())))).then(() => self.clients.matchAll({type: 'window', includeUncontrolled: true}).then(cs => {
     const c = cs.find(x => x.url.includes('/fuel/'));
     if (c) { c.postMessage('weigh'); return c.focus(); }
     return self.clients.openWindow(e.notification.data && e.notification.data.url || './?weigh=1');
-  }));
+  })));
 });
