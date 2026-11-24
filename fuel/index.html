@@ -106,6 +106,17 @@ svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .food.picked{background:var(--card2);box-shadow:inset 0 0 0 1.5px var(--acc)}
 .food.picked .selc{background:var(--acc);border-color:var(--acc)}
 .food.picked .selc svg{display:block}
+.wpad-fields{display:grid;grid-template-columns:1.3fr 1fr;gap:10px;margin:4px 0 12px}
+.wf{background:var(--card);border-radius:16px;padding:12px 14px;text-align:left;box-shadow:inset 0 0 0 1.5px transparent}
+.wf.on{box-shadow:inset 0 0 0 2px var(--acc)}
+.wf span{display:block;font-size:12px;font-weight:600;color:var(--ink2)}
+.wf b{font-size:34px;font-weight:800;letter-spacing:-.02em;line-height:1.15}
+.wf i{font-style:normal;font-size:15px;font-weight:700;color:var(--ink2);margin-left:4px}
+.wf .ph{color:var(--ink3)}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.keypad button{height:56px;border-radius:14px;background:var(--chip);font-size:24px;font-weight:700;display:grid;place-items:center}
+.keypad button:active{background:var(--line)}
+.keypad svg{width:24px;height:24px}
 .selbar{display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
 .selbar::-webkit-scrollbar{display:none}
 .selbar .x{flex:none;width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center}
@@ -1417,10 +1428,39 @@ function remindSheet() {
 function openWeight(date) {
   const ex = date ? S.weights.find(w => w.date === date) : S.weights.find(w => w.date === todayStr());
   const last = [...S.weights].sort((a, b) => b.date.localeCompare(a.date))[0];
-  sheet('Log weight', `<div class="field"><label for="wd">Day</label><input id="wd" type="date" value="${ex ? ex.date : todayStr()}"></div><div class="two"><div class="field"><label for="wk">Weight (kg)</label><input id="wk" type="number" inputmode="decimal" step="0.1" value="${ex ? ex.kg : (last ? last.kg : '')}"></div><div class="field"><label for="wbf">Body fat % (optional)</label><input id="wbf" type="number" inputmode="decimal" step="0.1" value="${ex && ex.bf != null ? ex.bf : ''}"></div></div><p class="note">Weigh in the morning after the toilet, before eating. The trend smooths out day-to-day water changes.</p>`,
+  // Built-in keypad: iOS will not raise the system keyboard unless the user taps a field, so the
+  // sheet is ready to type into the moment it opens (including from the reminder notification).
+  const vals = {kg: ex ? String(ex.kg) : '', bf: ex && ex.bf != null ? String(ex.bf) : ''};
+  let target = 'kg', fresh = true;
+  const ph = last ? String(last.kg) : '0.0';
+  sheet('Log weight', `<div class="field"><label for="wd">Day</label><input id="wd" type="date" value="${ex ? ex.date : todayStr()}"></div>
+    <div class="wpad-fields"><button class="wf on" data-wf="kg"><span>Weight</span><b class="num" id="wkv"></b><i>kg</i></button><button class="wf" data-wf="bf"><span>Body fat (optional)</span><b class="num" id="wbv"></b><i>%</i></button></div>
+    <div class="keypad" id="kp">${['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'del'].map(k => `<button data-k="${k}" aria-label="${k === 'del' ? 'Delete' : k}">${k === 'del' ? svg('back') : k}</button>`).join('')}</div>
+    <p class="note">${last && !ex ? `Last weigh-in ${last.kg} kg, ${esc(dayName(last.date).replace(/^(Today|Yesterday)$/, x => x.toLowerCase()))}. ` : ''}Weigh in the morning after the toilet, before eating.</p>`,
     (ex ? `<button class="btn danger" id="del" style="flex:none;width:56px" aria-label="Delete weigh-in">${svg('trash')}</button>` : '') + `<button class="btn" id="go">Save</button>`, el => {
-      $('#wk', el).focus(); $('#wk', el).select();
-      $('#go', el).onclick = () => { const kg = +$('#wk', el).value; const d = $('#wd', el).value; if (!(kg > 30 && kg < 300) || !d) return toast('Enter a weight in kg'); S.weights = S.weights.filter(w => w.date !== d && (!ex || w.date !== ex.date)); const bf = +$('#wbf', el).value; S.weights.push(Object.assign({date: d, kg: r1(kg)}, bf > 2 && bf < 60 ? {bf: r1(bf)} : {})); dirty(null); closeSheet(); toast('Weight saved'); };
+      const draw = () => {
+        $('#wkv', el).innerHTML = vals.kg ? esc(vals.kg) : `<span class="ph">${esc(ph)}</span>`;
+        $('#wbv', el).innerHTML = vals.bf ? esc(vals.bf) : '<span class="ph">–</span>';
+        $$('.wf', el).forEach(b => b.classList.toggle('on', b.dataset.wf === target));
+      };
+      draw();
+      $('.wpad-fields', el).onclick = e => { const b = e.target.closest('[data-wf]'); if (!b) return; target = b.dataset.wf; fresh = true; draw(); };
+      $('#kp', el).onclick = e => {
+        const b = e.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k;
+        let v = fresh ? '' : vals[target];
+        if (k === 'del') v = fresh ? '' : (vals[target] || '').slice(0, -1);
+        else if (k === '.') { if (!v.includes('.')) v = (v || '0') + '.'; }
+        else if (!(v.includes('.') && v.split('.')[1].length >= 1) && v.replace('.', '').length < 4) v += k;
+        fresh = false; vals[target] = v; draw();
+      };
+      $('#go', el).onclick = () => {
+        const kg = +vals.kg; const d = $('#wd', el).value;
+        if (!(kg > 30 && kg < 300) || !d) return toast('Enter a weight in kg');
+        S.weights = S.weights.filter(w => w.date !== d && (!ex || w.date !== ex.date));
+        const bf = +vals.bf;
+        S.weights.push(Object.assign({date: d, kg: r1(kg)}, bf > 2 && bf < 60 ? {bf: r1(bf)} : {}));
+        dirty(null); closeSheet(); toast('Weight saved');
+      };
       const del = $('#del', el); if (del) del.onclick = () => { S.weights = S.weights.filter(w => w.date !== ex.date); dirty(null); closeSheet(); toast('Deleted'); };
     });
 }
@@ -1551,7 +1591,10 @@ function eraseAll() {
   render(); scrollToNow();
   if (/[?&]weigh=1/.test(location.search)) { history.replaceState(null, '', location.pathname); openWeighIn(); }
   checkWeighFlag();
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkWeighFlag(); });
+  const burst = () => [0, 400, 1200, 2500, 4500].forEach(t => setTimeout(checkWeighFlag, t));
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') burst(); });
+  window.addEventListener('pageshow', burst);
+  setInterval(() => { if (document.visibilityState === 'visible') checkWeighFlag(); }, 3000);
   window.addEventListener('focus', checkWeighFlag);
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', ev => { if (ev.data === 'weigh') openWeighIn(); });
   pullCoach(); flushSync();
