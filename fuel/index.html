@@ -96,6 +96,24 @@ svg.i{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-widt
 .now{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--p);margin:2px 0}
 .now::after{content:"";flex:1;height:2px;background:var(--p);opacity:.6;border-radius:2px}
 .empty{color:var(--ink3);font-size:14px;padding:4px 0 0}
+.left{touch-action:pan-y;user-select:none;-webkit-user-select:none}
+.dots{display:flex;justify-content:center;gap:6px;margin-top:8px}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--line)}
+.dots i.on{background:var(--ink2)}
+.lv span.of{color:var(--ink3);font-weight:500;margin-top:0}
+.selc{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--ink3);display:grid;place-items:center;color:var(--onacc)}
+.selc svg{width:14px;height:14px;stroke-width:3;display:none}
+.food.picked{background:var(--card2);box-shadow:inset 0 0 0 1.5px var(--acc)}
+.food.picked .selc{background:var(--acc);border-color:var(--acc)}
+.food.picked .selc svg{display:block}
+.selbar{display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:0 16px}
+.selbar::-webkit-scrollbar{display:none}
+.selbar .x{flex:none;width:40px;height:40px;border-radius:50%;background:var(--ink);color:var(--bg);display:grid;place-items:center}
+.selbar .cnt{flex:none;font-size:15px;font-weight:700;line-height:1.15;padding:0 10px 0 2px;border-right:1px solid var(--line);margin-right:2px}
+.selbar .cnt small{display:block;font-size:12px;font-weight:600;color:var(--ink2)}
+.selbar .sa{flex:none;height:44px;padding:0 18px;border-radius:99px;background:var(--chip);font-size:15px;font-weight:700}
+.selbar .sa:disabled{opacity:.35}
+.selbar .sa.bad{color:var(--bad)}
 
 .dock{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--bg);border-top:1px solid var(--chip);padding:10px 16px calc(8px + env(safe-area-inset-bottom))}
 .dock-in{max-width:528px;margin:0 auto;display:flex;flex-direction:column;gap:10px}
@@ -410,9 +428,57 @@ function render() {
 function dockHtml() {
   const n = (v, ic, label) => `<button data-nav="${v}" class="${view === v ? 'cur' : ''}">${svg(ic)}${label}</button>`;
   return `<div class="dock"><div class="dock-in">
-    ${view === 'log' ? `<div class="srch"><button class="sb" data-act="search">${svg('search')}<span class="grow">Search for a food</span><span class="bc" data-act="scan" aria-label="Scan barcode">${svg('barcode')}</span></button><button class="qa" data-act="quick" aria-label="Quick add calories">${svg('bolt')}</button></div>` : ''}
+    ${view === 'log' && picked.size ? selBarHtml() : view === 'log' ? `<div class="srch"><button class="sb" data-act="search">${svg('search')}<span class="grow">Search for a food</span><span class="bc" data-act="scan" aria-label="Scan barcode">${svg('barcode')}</span></button><button class="qa" data-act="quick" aria-label="Quick add calories">${svg('bolt')}</button></div>` : ''}
     <nav class="nav" aria-label="Main">${n('dash', 'dash', 'Dashboard')}${n('log', 'log', 'Food Log')}<button data-act="shortcuts" aria-label="Add"><span class="plus">${svg('plus')}</span></button>${n('strat', 'strat', 'Strategy')}${n('more', 'more', 'More')}</nav>
   </div></div>`;
+}
+
+function selBarHtml() {
+  const n = picked.size;
+  return `<div class="selbar"><button class="x" data-sel="clear" aria-label="Cancel selection">${svg('close')}</button><div class="cnt">Select<small>${n} food${n === 1 ? '' : 's'}</small></div><button class="sa" data-sel="edit"${n === 1 ? '' : ' disabled'}>Edit</button><button class="sa" data-sel="copy">Copy</button><button class="sa" data-sel="move">Move</button><button class="sa bad" data-sel="remove">Remove</button><button class="sa" data-sel="meal">Save meal</button></div>`;
+}
+function pickedEntries() { return S.entries.filter(e => picked.has(e.id)); }
+function selAction(a) {
+  const es = pickedEntries(); if (!es.length && a !== 'clear') { picked.clear(); return render(); }
+  if (a === 'clear') { picked.clear(); return render(); }
+  if (a === 'edit') { const id = es[0].id; picked.clear(); render(); return openEntry(id); }
+  if (a === 'remove') { const d = es[0].date, ids = new Set(es.map(e => e.id)); S.entries = S.entries.filter(x => !ids.has(x.id)); es.forEach(e => dirty(e.date)); picked.clear(); render(); return toast(`Removed ${es.length} food${es.length === 1 ? '' : 's'}`, () => { S.entries.push(...es); es.forEach(e => dirty(e.date)); render(); }); }
+  if (a === 'meal') { picked.clear(); render(); return saveMeal(es, es[0].name); }
+  if (a === 'copy' || a === 'move') return copyMoveSheet(a, es);
+}
+function copyMoveSheet(mode, es) {
+  const one = es.length === 1, verb = mode === 'copy' ? 'Copy' : 'Move';
+  const firstT = es.map(e => e.time).sort()[0];
+  const defDate = mode === 'copy' ? todayStr() : es[0].date;
+  const defTime = mode === 'copy' && defDate !== es[0].date ? nowHM() : firstT;
+  const qd = (lab, d) => `<button data-qd="${d}">${lab}</button>`;
+  sheet(`${verb} ${es.length} food${one ? '' : 's'}`, `
+    <div class="chips" id="qds" style="margin-bottom:12px">${qd('Yesterday', addDays(todayStr(), -1))}${qd('Today', todayStr())}${qd('Tomorrow', addDays(todayStr(), 1))}</div>
+    <div class="two"><div class="field"><label for="cmd">Day</label><input id="cmd" type="date" value="${defDate}"></div>
+    <div class="field"><label for="cmt">Time${one ? '' : ' (first item)'}</label><input id="cmt" type="time" value="${defTime}"></div></div>
+    ${one ? '' : '<p class="note">Items keep their spacing relative to the first one.</p>'}
+    <div class="list">${es.map(e => foodCard(e)).join('')}</div>`,
+    `<button class="btn" id="go">${verb}</button>`, el => {
+      const cd = $('#cmd', el), ct = $('#cmt', el);
+      const mark = () => $$('#qds button', el).forEach(b => b.classList.toggle('on', b.dataset.qd === cd.value));
+      mark(); cd.onchange = mark;
+      $('#qds', el).onclick = ev => { const b = ev.target.closest('[data-qd]'); if (!b) return; cd.value = b.dataset.qd; mark(); };
+      $('#go', el).onclick = () => {
+        const date = cd.value || defDate, t0 = ct.value || defTime, shift = mins(t0) - mins(firstT);
+        const tAt = e => { const m = Math.min(23 * 60 + 59, Math.max(0, mins(e.time) + shift)); return pad(Math.floor(m / 60)) + ':' + pad(m % 60); };
+        const olds = es.map(e => Object.assign({}, e));
+        if (mode === 'copy') {
+          const recs = es.map(e => Object.assign({}, e, {id: uid(), date, time: tAt(e)}));
+          S.entries.push(...recs); dirty(date); picked.clear(); closeSheet(true);
+          toast(`Copied to ${dayName(date).toLowerCase()}`, () => { const ids = new Set(recs.map(r => r.id)); S.entries = S.entries.filter(x => !ids.has(x.id)); dirty(date); render(); });
+        } else {
+          const ids = new Set(es.map(e => e.id));
+          S.entries = S.entries.map(x => ids.has(x.id) ? Object.assign({}, x, {date, time: tAt(x)}) : x);
+          olds.forEach(e => dirty(e.date)); dirty(date); picked.clear(); closeSheet(true);
+          toast(`Moved to ${dayName(date).toLowerCase()}`, () => { S.entries = S.entries.map(x => ids.has(x.id) ? olds.find(o => o.id === x.id) : x); olds.forEach(e => dirty(e.date)); dirty(date); render(); });
+        }
+      };
+    });
 }
 
 function weekStrip() {
@@ -428,10 +494,17 @@ function weekStrip() {
 
 function stickyBar(d) {
   const t = targetFor(d); const s = sum(dayEntries(d));
-  const c = (val, tgt, lab, col, unit) => { const left = tgt - val, over = left < 0;
-    return `<div class="sv num${over ? ' over' : ''}"><em style="color:${col}">${lab}</em><b>${over ? '+' + fmt(-left) : fmt(left)}${unit}</b> ${over ? 'over' : 'left'}<div class="bar"><i style="width:${Math.min(100, val / tgt * 100)}%;background:${col}"></i></div></div>`; };
+  const eaten = leftMode() === 'eaten';
+  const c = (val, tgt, lab, col, unit) => { const left = tgt - val, over = !eaten && left < 0;
+    return `<div class="sv num${over ? ' over' : ''}"><em style="color:${col}">${lab}</em>${eaten ? `<b>${fmt(val)}</b>/${fmt(tgt)}` : `<b>${over ? '+' + fmt(-left) : fmt(left)}${unit}</b> ${over ? 'over' : 'left'}`}<div class="bar"><i style="width:${Math.min(100, val / tgt * 100)}%;background:${col}"></i></div></div>`; };
   return `<div class="stick" id="stick" aria-hidden="true"><div class="sd">${dayName(d)}</div><button class="sg" data-act="daydetail" tabindex="-1">${c(s.kcal, t.kcal, '🔥', 'var(--acc)', '')}${c(s.p, t.p, 'P', 'var(--p)', 'g')}${c(s.f, t.f, 'F', 'var(--f)', 'g')}${c(s.c, t.c, 'C', 'var(--c)', 'g')}</button></div>`;
 }
+function leftMode() { return (S.ui && S.ui.left) || 'left'; }
+function toggleLeftMode() { S.ui = S.ui || {}; S.ui.left = leftMode() === 'eaten' ? 'left' : 'eaten'; save(); render(); }
+let swipeX = null, swipeY = 0, swiped = false;
+document.addEventListener('pointerdown', e => { const lp = e.target.closest && e.target.closest('.left,.stick .sg'); swipeX = lp ? e.clientX : null; swipeY = e.clientY; swiped = false; }, {passive: true});
+document.addEventListener('pointerup', e => { if (swipeX == null) return; const dx = e.clientX - swipeX, dy = e.clientY - swipeY; swipeX = null; if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) { swiped = true; toggleLeftMode(); setTimeout(() => swiped = false, 400); } }, {passive: true});
+document.addEventListener('pointercancel', () => swipeX = null, {passive: true});
 function syncStick() {
   const st = document.getElementById('stick'), lp = document.querySelector('#app .left');
   if (!st || !lp) return;
@@ -442,16 +515,22 @@ window.addEventListener('scroll', syncStick, {passive: true});
 
 function leftPanel(d) {
   const t = targetFor(d); const s = sum(dayEntries(d));
+  const eaten = leftMode() === 'eaten';
   const lv = (val, tgt, label, col, unit) => {
     const left = tgt - val; const over = left < 0;
-    return `<div class="lv"><b class="num${over ? ' over' : ''}">${over ? '+' + fmt(-left) : fmt(left)}${unit}</b><span>${over ? label + ' over' : label}</span><div class="bar"><i style="width:${Math.min(100, val / tgt * 100)}%;background:${col}"></i></div></div>`;
+    const bar = `<div class="bar"><i style="width:${Math.min(100, val / tgt * 100)}%;background:${col}"></i></div>`;
+    if (eaten) return `<div class="lv"><b class="num">${fmt(val)}${unit}</b><span>${label === 'kcal left' ? 'kcal eaten' : label}</span><span class="of num">of ${fmt(tgt)}${unit}</span>${bar}</div>`;
+    return `<div class="lv"><b class="num${over ? ' over' : ''}">${over ? '+' + fmt(-left) : fmt(left)}${unit}</b><span>${over ? label.replace(' left', '') + ' over' : label}</span>${bar}</div>`;
   };
-  return `<button class="left" data-act="daydetail" aria-label="Day nutrition details">${lv(s.kcal, t.kcal, 'kcal left', 'var(--acc)', '')}${lv(s.p, t.p, 'Protein', 'var(--p)', 'g')}${lv(s.f, t.f, 'Fat', 'var(--f)', 'g')}${lv(s.c, t.c, 'Carbs', 'var(--c)', 'g')}</button>
+  return `<button class="left" data-act="daydetail" aria-label="Day nutrition details. Swipe to switch between remaining and eaten">${lv(s.kcal, t.kcal, 'kcal left', 'var(--acc)', '')}${lv(s.p, t.p, 'Protein', 'var(--p)', 'g')}${lv(s.f, t.f, 'Fat', 'var(--f)', 'g')}${lv(s.c, t.c, 'Carbs', 'var(--c)', 'g')}</button>
+  <div class="dots" aria-hidden="true"><i class="${eaten ? '' : 'on'}"></i><i class="${eaten ? 'on' : ''}"></i></div>
   <div class="micro"><span>Fibre <b class="num">${r0(s.fibre)}</b>/30g</span><span>Sodium <b class="num">${fmt(s.sodium)}</b>/2,300mg</span><span>Sugar <b class="num">${r0(s.sugar)}</b>g</span><span>Sat fat <b class="num">${r0(s.satfat)}</b>g</span></div>`;
 }
 
-function foodCard(e) {
-  return `<button class="food" data-entry="${e.id}"><span class="ic">${esc(e.emoji || '🍽️')}</span><span class="fi"><span class="nm">${esc(e.name)}</span><span class="mx num"><span class="k">${fmt(e.kcal)} kcal</span><span class="m P">${r0(e.p)}P</span><span class="m F">${r0(e.f)}F</span><span class="m C">${r0(e.c)}C</span>${e.label ? `<span>${esc(e.label)}</span>` : ''}</span></span><span class="ed">${svg('pen')}</span></button>`;
+let picked = new Set();
+function foodCard(e, selectable) {
+  const sm = selectable && picked.size;
+  return `<button class="food${picked.has(e.id) && selectable ? ' picked' : ''}" data-${selectable ? 'pick' : 'entry'}="${e.id}"${selectable ? ` aria-pressed="${picked.has(e.id)}"` : ''}>${sm ? `<span class="selc">${svg('check')}</span>` : ''}<span class="ic">${esc(e.emoji || '🍽️')}</span><span class="fi"><span class="nm">${esc(e.name)}</span><span class="mx num"><span class="k">${fmt(e.kcal)} kcal</span><span class="m P">${r0(e.p)}P</span><span class="m F">${r0(e.f)}F</span><span class="m C">${r0(e.c)}C</span>${e.label ? `<span>${esc(e.label)}</span>` : ''}</span></span><span class="ed"${selectable ? ` data-entry="${e.id}" role="button" aria-label="Edit ${esc(e.name)}"` : ''}>${svg('pen')}</span></button>`;
 }
 
 function suggestions(date, centerMin, limit = 8, windowMin = 75) {
@@ -492,7 +571,7 @@ function logView() {
     const es = list.filter(e => +e.time.slice(0, 2) === h);
     const tot = sum(es);
     tl += `<div class="hour"><span class="hp${es.length ? ' has' : ''}">${hourLabel(h)}</span><button class="add" data-addhour="${h}" aria-label="Add food at ${hourLabel(h)}">${svg('plus')}</button>${es.length ? `<button class="tot num" data-hourmenu="${h}"><b>${fmt(tot.kcal)}</b> kcal · ${r0(tot.p)}P ${r0(tot.f)}F ${r0(tot.c)}C</button>` : ''}</div>`;
-    es.forEach(e => tl += foodCard(e));
+    es.forEach(e => tl += foodCard(e, true));
     const sg = sugByHour[h];
     if (sg) {
       const e = sg.last;
@@ -646,12 +725,15 @@ function moreView() {
 function bindCommon() {
   const app = $('#app');
   app.onclick = ev => {
-    const b = ev.target.closest('[data-nav],[data-act],[data-day],[data-week],[data-entry],[data-addhour],[data-hourmenu],[data-sug],[data-rate],[data-weight]');
+    const b = ev.target.closest('[data-nav],[data-act],[data-day],[data-week],[data-entry],[data-pick],[data-sel],[data-addhour],[data-hourmenu],[data-sug],[data-rate],[data-weight]');
     if (!b) return;
     const ds = b.dataset;
-    if (ds.nav) { view = ds.nav; window.scrollTo(0, 0); render(); if (view === 'log') scrollToNow(); return; }
-    if (ds.day) { selDate = ds.day; render(); return; }
-    if (ds.week) { selDate = addDays(selDate, +ds.week); render(); return; }
+    if (swiped && ds.act === 'daydetail') return;
+    if (ds.sel) return selAction(ds.sel);
+    if (ds.pick) { picked.has(ds.pick) ? picked.delete(ds.pick) : picked.add(ds.pick); return render(); }
+    if (ds.nav) { picked.clear(); view = ds.nav; window.scrollTo(0, 0); render(); if (view === 'log') scrollToNow(); return; }
+    if (ds.day) { picked.clear(); selDate = ds.day; render(); return; }
+    if (ds.week) { picked.clear(); selDate = addDays(selDate, +ds.week); render(); return; }
     if (ds.entry) return openEntry(ds.entry);
     if (ds.addhour) { const h = +ds.addhour; const cur = new Date().getHours(); const time = (selDate === todayStr() && h === cur) ? nowHM() : pad(h) + ':00'; return openAdd({time}); }
     if (ds.hourmenu) return hourMenu(+ds.hourmenu);
@@ -661,7 +743,7 @@ function bindCommon() {
     const a = ds.act; ev.stopPropagation();
     if (a === 'scan') { ev.preventDefault(); return openScanner(); }
     if (a === 'search') { addTab = 'search'; return openAdd({time: defaultTime()}); }
-    if (a === 'shortcuts') return openShortcuts();
+    if (a === 'shortcuts') { picked.clear(); addTab = 'search'; return openAdd({time: defaultTime()}); }
     if (a === 'quick') return openQuick({time: defaultTime()});
     if (a === 'daymenu') return dayMenu();
     if (a === 'daydetail') return dayDetail();
@@ -793,9 +875,9 @@ function openAdd(ctx) {
     let cache = {};
     const remember = f => (cache[f.id] = f, f.id);
     $('#scanb', el).onclick = () => openScanner(getTime, f => addToBasket(f));
-    const T = [['search', 'Search'], ['favs', 'Favourites'], ['meals', 'Meals'], ['mine', 'My foods'], ['quick', 'Quick add']];
+    const T = [['search', 'Search'], ['favs', 'Favourites'], ['meals', 'Meals'], ['mine', 'My foods'], ['quick', 'Quick add'], ['weight', 'Weight'], ['more', 'More']];
     const drawTabs = () => tabs.innerHTML = T.map(([k, l]) => `<button data-t="${k}" class="${addTab === k ? 'on' : ''}">${l}</button>`).join('');
-    tabs.onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; if (b.dataset.t === 'quick') return openQuick({time: getTime()}); addTab = b.dataset.t; drawTabs(); draw(); };
+    tabs.onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; if (b.dataset.t === 'quick') return openQuick({time: getTime()}); if (b.dataset.t === 'weight') return openWeight(); if (b.dataset.t === 'more') { closeSheet(true); return openShortcuts(); } addTab = b.dataset.t; drawTabs(); draw(); };
 
     function drawFoot() {
       const k = basket.reduce((n, x) => n + x.kcal, 0);
@@ -912,7 +994,7 @@ function openAdd(ctx) {
       toast(`Logged ${recs.length} food${recs.length === 1 ? '' : 's'}`, () => { const ids = new Set(recs.map(r => r.id)); S.entries = S.entries.filter(x => !ids.has(x.id)); dirty(selDate); render(); });
     };
     drawTabs(); draw(); drawFoot();
-    setTimeout(() => q.focus(), 60);
+    if (addTab === 'search') { try { q.focus({preventScroll: true}); } catch (e) { q.focus(); } }
   }, {right});
 }
 const norm1 = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
