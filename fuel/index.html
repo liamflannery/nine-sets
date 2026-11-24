@@ -756,7 +756,7 @@ function bindCommon() {
     const a = ds.act; ev.stopPropagation();
     if (a === 'scan') { ev.preventDefault(); return openScanner(); }
     if (a === 'search') { addTab = 'search'; return openAdd({time: defaultTime()}); }
-    if (a === 'shortcuts') { picked.clear(); addTab = 'search'; return openAdd({time: defaultTime()}); }
+    if (a === 'shortcuts') { picked.clear(); return openShortcuts(); }
     if (a === 'quick') return openQuick({time: defaultTime()});
     if (a === 'daymenu') return dayMenu();
     if (a === 'daydetail') return dayDetail();
@@ -889,9 +889,9 @@ function openAdd(ctx) {
     let cache = {};
     const remember = f => (cache[f.id] = f, f.id);
     $('#scanb', el).onclick = () => openScanner(getTime, f => addToBasket(f));
-    const T = [['search', 'Search'], ['favs', 'Favourites'], ['meals', 'Meals'], ['mine', 'My foods'], ['quick', 'Quick add'], ['weight', 'Weight'], ['more', 'More']];
+    const T = [['search', 'Search'], ['favs', 'Favourites'], ['meals', 'Meals'], ['mine', 'My foods'], ['quick', 'Quick add'], ['weight', 'Weight']];
     const drawTabs = () => tabs.innerHTML = T.map(([k, l]) => `<button data-t="${k}" class="${addTab === k ? 'on' : ''}">${l}</button>`).join('');
-    tabs.onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; if (b.dataset.t === 'quick') return openQuick({time: getTime()}); if (b.dataset.t === 'weight') return openWeight(); if (b.dataset.t === 'more') { closeSheet(true); return openShortcuts(); } addTab = b.dataset.t; drawTabs(); draw(); };
+    tabs.onclick = e => { const b = e.target.closest('[data-t]'); if (!b) return; if (b.dataset.t === 'quick') return openQuick({time: getTime()}); if (b.dataset.t === 'weight') return openWeight(); addTab = b.dataset.t; drawTabs(); draw(); };
 
     function drawFoot() {
       const k = basket.reduce((n, x) => n + x.kcal, 0);
