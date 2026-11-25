@@ -1535,9 +1535,25 @@ function importInbox(rows) {
   if (!Array.isArray(rows) || !rows.length) return;
   S.inboxDone = S.inboxDone || [];
   const added = [];
+  S.inboxSig = S.inboxSig || {};
+  const sigEntry = e => [e.date, e.time, e.name, e.kcal, e.p, e.f, e.c, e.label || ''].join('|');
+  const sigOf = x => sigEntry({date: x.date, time: /^\d{1,2}:\d{2}/.test(x.time) ? String(x.time).padStart(5, '0').slice(0, 5) : '12:00', name: String(x.name || 'Added by Claude').slice(0, 80), kcal: +x.kcal, p: +x.p || 0, f: +x.f || 0, c: +x.c || 0, label: String(x.label || '')});
+  let updated = 0;
   rows.forEach(x => {
     const id = 'in-' + String(x.id || '').trim();
-    if (id === 'in-' || S.inboxDone.includes(id) || S.entries.some(e => e.id === id)) return;
+    if (id === 'in-') return;
+    if (S.inboxDone.includes(id) || S.entries.some(e => e.id === id)) {
+      // A corrected row in the Sheet updates the entry, unless it was edited in the app since.
+      const sig = sigOf(x), e = S.entries.find(e => e.id === id);
+      if (e && !S.inboxSig[id] && sigEntry(e) === sig) S.inboxSig[id] = sig;
+      if (e && S.inboxSig[id] && S.inboxSig[id] !== sig && sigEntry(e) === S.inboxSig[id] && /^\d{4}-\d{2}-\d{2}$/.test(x.date) && +x.kcal >= 0) {
+        const old = e.date;
+        Object.assign(e, {date: x.date, time: /^\d{1,2}:\d{2}/.test(x.time) ? x.time.padStart(5, '0').slice(0, 5) : e.time, name: String(x.name || e.name).slice(0, 80), label: String(x.label || ''), kcal: +x.kcal, p: +x.p || 0, f: +x.f || 0, c: +x.c || 0});
+        if (x.fibre !== '' && x.fibre != null) e.fibre = +x.fibre;
+        S.inboxSig[id] = sigEntry(e); dirty(old); dirty(e.date); updated++;
+      }
+      return;
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(x.date) || !(+x.kcal >= 0)) return;
     const time = /^\d{1,2}:\d{2}/.test(x.time) ? x.time.padStart(5, '0').slice(0, 5) : '12:00';
     const name = String(x.name || 'Added by Claude').slice(0, 80);
@@ -1545,8 +1561,9 @@ function importInbox(rows) {
       kcal: +x.kcal, p: +x.p || 0, f: +x.f || 0, c: +x.c || 0};
     if (x.fibre !== '' && x.fibre != null) rec.fibre = +x.fibre;
     if (x.sodium !== '' && x.sodium != null) rec.sodium = +x.sodium;
-    S.entries.push(rec); S.inboxDone.push(id); added.push(rec);
+    S.entries.push(rec); S.inboxDone.push(id); added.push(rec); S.inboxSig[id] = sigEntry(rec);
   });
+  if (updated && !added.length) { save(); if (!stack.length) render(); toast(updated === 1 ? 'Claude updated an entry' : `Claude updated ${updated} entries`); }
   if (!added.length) return;
   [...new Set(added.map(e => e.date))].forEach(d => dirty(d));
   if (!stack.length) render();
